@@ -11,6 +11,9 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Skills from "./pages/Skills";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
+import AdminPage from "./pages/admin/Admin";
+import CMSProjectsList from "./pages/cms/ProjectsList";
+import CMSProjectDetail from "./pages/cms/ProjectDetail";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +32,9 @@ const App = () => (
             <Route path="skills" element={<Skills />} />
             <Route path="contact" element={<Contact />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="admin" element={<AdminPage />} />
+            <Route path="cms/projects" element={<CMSProjectsList />} />
+            <Route path="cms/projects/:slug" element={<CMSProjectDetail />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>
