@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 // Lovable Supabase native integration: URL/key should be injected by the platform.
 // We avoid VITE_* envs per project rules. If missing, admin UI will show a setup notice.
@@ -8,8 +8,17 @@ const supabaseAnonKey = (window as any)?.SUPABASE_ANON_KEY || (window as any)?._
 
 export const ADMIN_EMAIL = "ihassanrayan@gmail.com";
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
 export function isSupabaseConfigured() {
   return Boolean(supabaseUrl && supabaseAnonKey);
 }
+
+// Create client only when configured. Otherwise, export a safe proxy that throws on use.
+export const supabase: SupabaseClient = isSupabaseConfigured()
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : (new Proxy({}, {
+      get() {
+        throw new Error(
+          "Supabase is not configured. Click the green Supabase button (top-right) to connect, then reload."
+        );
+      },
+    }) as unknown as SupabaseClient);
