@@ -50,6 +50,27 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_backups: {
+        Row: {
+          created_at: string
+          id: string
+          projects: Json
+          site_settings: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          projects?: Json
+          site_settings?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          projects?: Json
+          site_settings?: Json
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           createdAt: string
@@ -167,6 +188,14 @@ export type Database = {
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      restore_from_backup: {
+        Args: { backup_id: string }
+        Returns: undefined
+      }
+      take_daily_backup: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
     }
     Enums: {
