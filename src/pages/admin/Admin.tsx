@@ -11,6 +11,7 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { generateResponsiveImages } from "@/lib/image";
 import { slugify } from "@/lib/slug";
 import type { Category, ProjectRow, SiteSettings, Status } from "@/types/cms";
+import { useNavigate } from "react-router-dom";
 
 const categories: Category[] = ["Mechanical", "Electrical", "Software", "Mini"];
 const statuses: Status[] = ["In Progress", "Completed"];
@@ -67,6 +68,7 @@ function NoIndexMeta() {
 
 export default function AdminPage() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [view, setView] = useState<"list" | "new" | "edit" | "settings">("list");
   const [editing, setEditing] = useState<ProjectRow | null>(null);
   const { allowed, isAdmin, role, loading, userEmail } = useAuthRole();
@@ -151,7 +153,7 @@ export default function AdminPage() {
       const password = String(form.get("password") || "");
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return toast({ title: "Login failed", description: error.message });
-      window.location.href = '/admin';
+      navigate('/admin');
     } catch (err: any) {
       toast({ title: 'Login error', description: err.message || String(err) });
     }
@@ -187,7 +189,7 @@ export default function AdminPage() {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return toast({ title: 'Update failed', description: error.message });
     toast({ title: 'Password updated', description: 'You can now continue.' });
-    window.location.href = '/admin';
+    navigate('/admin');
   };
   const onSave = async (payload: Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
     const now = new Date().toISOString();
