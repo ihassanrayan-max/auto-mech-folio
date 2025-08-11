@@ -50,6 +50,7 @@ export default function ProjectDetail() {
   } as const;
 
   const hero = (project.media as any)?.images?.[0] || "/placeholder.svg";
+  const videoUrl = (project.media as any)?.videoUrl || null;
 
   return (
     <main className="container py-12">
@@ -60,6 +61,12 @@ export default function ProjectDetail() {
       />
       <article>
         <h1 className="font-heading text-3xl sm:text-4xl font-bold mb-4">{project.title}</h1>
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground mb-4">
+          <Badge variant="secondary">{project.category}</Badge>
+          <Badge variant="outline">{project.status}</Badge>
+          <span className="ml-2">Started: {new Date(project.dateStarted).toLocaleDateString()}</span>
+          <span>{project.dateCompleted ? `Completed: ${new Date(project.dateCompleted).toLocaleDateString()}` : 'Ongoing'}</span>
+        </div>
         <img
           src={hero}
           alt={`${project.title} hero image`}
@@ -81,7 +88,25 @@ export default function ProjectDetail() {
             <ReactMarkdown>{project.longDescription}</ReactMarkdown>
           </div>
         ) : null}
-        <div className="mt-8">
+        <div className="mt-8 flex flex-wrap gap-3">
+          {project.githubUrl ? (
+            <Button asChild variant="secondary">
+              <a href={project.githubUrl} target="_blank" rel="noreferrer">View on GitHub</a>
+            </Button>
+          ) : null}
+          {Array.isArray(project.externalLinks) && project.externalLinks.length > 0
+            ? project.externalLinks.map((u, i) => (
+                <Button key={u + i} asChild variant="outline">
+                  <a href={u} target="_blank" rel="noreferrer">{new URL(u).hostname.replace("www.", "")}</a>
+                </Button>
+              ))
+            : null}
+          {videoUrl ? (
+            <Button asChild>
+              <a href={videoUrl} target="_blank" rel="noreferrer">Watch Demo</a>
+            </Button>
+          ) : null}
+          <div className="grow" />
           <Button asChild>
             <Link to="/projects">Back to Projects</Link>
           </Button>

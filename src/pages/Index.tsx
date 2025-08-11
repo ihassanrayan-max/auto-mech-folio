@@ -71,6 +71,9 @@ const Index = () => {
                     summary={p.shortSummary}
                     image={image}
                     imageAlt={`${p.title} hero image`}
+                    category={p.category as any}
+                    status={p.status as any}
+                    tags={p.tags}
                   />
                 );
               })}
