@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          id: string
+          new_data: Json | null
+          occurred_at: string
+          old_data: Json | null
+          record_id: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          id?: string
+          new_data?: Json | null
+          occurred_at?: string
+          old_data?: Json | null
+          record_id?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          id?: string
+          new_data?: Json | null
+          occurred_at?: string
+          old_data?: Json | null
+          record_id?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          createdAt: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updatedAt: string
+        }
+        Insert: {
+          createdAt?: string
+          id: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updatedAt?: string
+        }
+        Update: {
+          createdAt?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updatedAt?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           category: Database["public"]["Enums"]["category_enum"]
@@ -100,12 +157,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_role: {
+        Args: {
+          _user_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: boolean
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
     }
     Enums: {
+      app_role: "admin" | "editor"
       category_enum: "Mechanical" | "Electrical" | "Software" | "Mini"
       status_enum: "In Progress" | "Completed"
     }
@@ -235,6 +300,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["admin", "editor"],
       category_enum: ["Mechanical", "Electrical", "Software", "Mini"],
       status_enum: ["In Progress", "Completed"],
     },
