@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase, isSupabaseConfigured, ADMIN_EMAIL } from "@/lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
@@ -15,12 +15,25 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
         setChecking(false);
         return;
       }
-      const { data } = await supabase.auth.getUser();
-      const ok = Boolean(data.user && data.user.email === ADMIN_EMAIL);
-      setAllowed(ok);
-      setChecking(false);
-      const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-        setAllowed(Boolean(session?.user?.email === ADMIN_EMAIL));
+      const computeAllowed = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setAllowed(false);
+          setChecking(false);
+          return;
+        }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+        const role = (profile as any)?.role as string | undefined;
+        setAllowed(role === 'admin' || role === 'editor');
+        setChecking(false);
+      };
+      await computeAllowed();
+      const { data: sub } = supabase.auth.onAuthStateChange((_evt) => {
+        setTimeout(() => { void computeAllowed(); }, 0);
       });
       unsub = () => sub.subscription.unsubscribe();
     };

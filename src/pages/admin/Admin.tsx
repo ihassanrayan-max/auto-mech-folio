@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase, isSupabaseConfigured, ADMIN_EMAIL } from "@/lib/supabaseClient";
+import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { generateResponsiveImages } from "@/lib/image";
 import { slugify } from "@/lib/slug";
 import type { Category, ProjectRow, SiteSettings, Status } from "@/types/cms";
@@ -15,22 +15,41 @@ import type { Category, ProjectRow, SiteSettings, Status } from "@/types/cms";
 const categories: Category[] = ["Mechanical", "Electrical", "Software", "Mini"];
 const statuses: Status[] = ["In Progress", "Completed"];
 
-function useSessionAllowed() {
-  const [allowed, setAllowed] = useState(false);
+function useAuthRole() {
+  const [state, setState] = useState<{ allowed: boolean; isAdmin: boolean; role: 'admin' | 'editor' | null; loading: boolean; userEmail: string}>({
+    allowed: false,
+    isAdmin: false,
+    role: null,
+    loading: true,
+    userEmail: "",
+  });
   useEffect(() => {
     let unsub: (() => void) | null = null;
+    const apply = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setState({ allowed: false, isAdmin: false, role: null, loading: false, userEmail: "" });
+        return;
+      }
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+      const role = (profile as any)?.role as 'admin' | 'editor' | undefined;
+      const allowed = role === 'admin' || role === 'editor';
+      setState({ allowed, isAdmin: role === 'admin', role: role ?? null, loading: false, userEmail: user.email || "" });
+    };
     const init = async () => {
-      const { data } = await supabase.auth.getUser();
-      setAllowed(Boolean(data.user?.email === ADMIN_EMAIL));
-      const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-        setAllowed(Boolean(session?.user?.email === ADMIN_EMAIL));
+      await apply();
+      const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "PASSWORD_RECOVERY") {
+          // handled in component UI
+        }
+        setTimeout(() => { void apply(); }, 0);
       });
       unsub = () => sub.subscription.unsubscribe();
     };
     init();
     return () => unsub?.();
   }, []);
-  return allowed;
+  return state;
 }
 
 function NoIndexMeta() {
@@ -50,10 +69,11 @@ export default function AdminPage() {
   const { toast } = useToast();
   const [view, setView] = useState<"list" | "new" | "edit" | "settings">("list");
   const [editing, setEditing] = useState<ProjectRow | null>(null);
-  const allowed = useSessionAllowed();
+  const { allowed, isAdmin, role, loading, userEmail } = useAuthRole();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [search, setSearch] = useState("");
   const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const [authMode, setAuthMode] = useState<"signin"|"signup"|"forgot"|"reset">("signin");
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -81,6 +101,19 @@ export default function AdminPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') setAuthMode('reset');
+    });
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      setAuthMode('reset');
+    }
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return projects.filter((p) => !q || p.title.toLowerCase().includes(q) || p.shortSummary.toLowerCase().includes(q));
@@ -106,17 +139,56 @@ export default function AdminPage() {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const email = String(form.get("email") || "");
-    const password = String(form.get("password") || "");
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return toast({ title: "Login failed", description: error.message });
-    if (data.user?.email !== ADMIN_EMAIL) {
-      await supabase.auth.signOut();
-      return toast({ title: "Unauthorized", description: "This account is not allowed." });
+    try {
+      // Clean up existing state and sign out
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) localStorage.removeItem(key);
+      });
+      try { await supabase.auth.signOut({ scope: 'global' } as any); } catch {}
+
+      const form = new FormData(e.currentTarget);
+      const email = String(form.get("email") || "");
+      const password = String(form.get("password") || "");
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return toast({ title: "Login failed", description: error.message });
+      window.location.href = '/admin';
+    } catch (err: any) {
+      toast({ title: 'Login error', description: err.message || String(err) });
     }
   };
 
+  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") || "");
+    const password = String(form.get("password") || "");
+    const redirectTo = `${window.location.origin}/admin`;
+    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
+    if (error) return toast({ title: 'Sign up failed', description: error.message });
+    toast({ title: 'Check your email', description: 'Confirm your email to complete sign up.' });
+    setAuthMode('signin');
+  };
+
+  const handleResetRequest = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") || "");
+    const redirectTo = `${window.location.origin}/admin`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) return toast({ title: 'Reset failed', description: error.message });
+    toast({ title: 'Email sent', description: 'Check your inbox for the reset link.' });
+    setAuthMode('signin');
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const password = String(form.get("password") || "");
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return toast({ title: 'Update failed', description: error.message });
+    toast({ title: 'Password updated', description: 'You can now continue.' });
+    window.location.href = '/admin';
+  };
   const onSave = async (payload: Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
     const now = new Date().toISOString();
     if (payload.id) {
@@ -183,20 +255,64 @@ export default function AdminPage() {
       {!allowed ? (
         <Card className="max-w-md mx-auto">
           <CardHeader>
-            <CardTitle>Admin Login</CardTitle>
+            <CardTitle>{authMode === 'signup' ? 'Create account' : authMode === 'forgot' ? 'Forgot password' : authMode === 'reset' ? 'Set new password' : 'Admin Login'}</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" required defaultValue={ADMIN_EMAIL} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" name="password" type="password" required />
-              </div>
-              <Button type="submit">Sign in</Button>
-            </form>
+            {authMode === 'signin' && (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" name="email" type="email" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input id="password" name="password" type="password" required />
+                </div>
+                <Button type="submit">Sign in</Button>
+                <div className="text-sm text-muted-foreground flex gap-3 pt-2">
+                  <button type="button" className="underline" onClick={() => setAuthMode('signup')}>Sign up</button>
+                  <button type="button" className="underline" onClick={() => setAuthMode('forgot')}>Forgot password</button>
+                </div>
+                <p className="text-xs text-muted-foreground">Note: New accounts default to Editor access. Admin can upgrade your role.</p>
+              </form>
+            )}
+            {authMode === 'signup' && (
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="su-email">Email</Label>
+                  <Input id="su-email" name="email" type="email" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="su-password">Password</Label>
+                  <Input id="su-password" name="password" type="password" required />
+                </div>
+                <Button type="submit">Create account</Button>
+                <div className="text-sm text-muted-foreground pt-2">
+                  <button type="button" className="underline" onClick={() => setAuthMode('signin')}>Back to sign in</button>
+                </div>
+              </form>
+            )}
+            {authMode === 'forgot' && (
+              <form onSubmit={handleResetRequest} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fp-email">Email</Label>
+                  <Input id="fp-email" name="email" type="email" required />
+                </div>
+                <Button type="submit">Send reset link</Button>
+                <div className="text-sm text-muted-foreground pt-2">
+                  <button type="button" className="underline" onClick={() => setAuthMode('signin')}>Back to sign in</button>
+                </div>
+              </form>
+            )}
+            {authMode === 'reset' && (
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="np-password">New password</Label>
+                  <Input id="np-password" name="password" type="password" required />
+                </div>
+                <Button type="submit">Update password</Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -204,7 +320,7 @@ export default function AdminPage() {
           <div className="flex items-center gap-2">
             <Button variant={view === "list" ? "default" : "outline"} onClick={() => setView("list")}>Projects</Button>
             <Button variant={view === "new" ? "default" : "outline"} onClick={() => setView("new")}>Add New</Button>
-            <Button variant={view === "settings" ? "default" : "outline"} onClick={() => setView("settings")}>Site Settings</Button>
+            <Button disabled={!isAdmin} variant={view === "settings" ? "default" : "outline"} onClick={() => isAdmin && setView("settings")}>Site Settings</Button>
             <div className="ml-auto flex items-center gap-2">
               <Input placeholder="Search…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-48" />
               <Button variant="outline" onClick={() => supabase.auth.signOut()}>Sign out</Button>

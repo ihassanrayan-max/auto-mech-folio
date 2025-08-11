@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import AdminPage from "./pages/admin/Admin";
 import CMSProjectsList from "./pages/cms/ProjectsList";
 import CMSProjectDetail from "./pages/cms/ProjectDetail";
+import AdminGuard from "@/components/projects/AdminGuard";
 
 const queryClient = new QueryClient();
 
@@ -32,7 +33,7 @@ const App = () => (
             <Route path="skills" element={<Skills />} />
             <Route path="contact" element={<Contact />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="admin" element={<AdminPage />} />
+            <Route path="admin" element={<AdminGuard><AdminPage /></AdminGuard>} />
             <Route path="cms/projects" element={<CMSProjectsList />} />
             <Route path="cms/projects/:slug" element={<CMSProjectDetail />} />
             <Route path="*" element={<NotFound />} />
