@@ -2,8 +2,28 @@ import SEO from "@/components/SEO";
 import profileImg from "@/assets/profile-portrait.jpg";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import ProjectCard from "@/components/ProjectCard";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { ProjectRow } from "@/types/cms";
 
 const Index = () => {
+  const { data: featured, isLoading } = useQuery({
+    queryKey: ["projects", "featured"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("featured", true)
+        .eq("published", true)
+        .order("priority", { ascending: false })
+        .order("createdAt", { ascending: false })
+        .limit(3);
+      if (error) throw error;
+      return (data as unknown as ProjectRow[]) || [];
+    },
+  });
+
   return (
     <main>
       <SEO
@@ -33,6 +53,39 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      <section className="border-t">
+        <div className="container py-12">
+          <h2 className="font-heading text-2xl font-semibold mb-6">Featured Projects</h2>
+          {isLoading ? (
+            <p>Loading featured projects…</p>
+          ) : featured && featured.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featured.map((p) => {
+                const image = (p.media as any)?.images?.[0] || "/placeholder.svg";
+                return (
+                  <ProjectCard
+                    key={p.slug}
+                    slug={p.slug}
+                    title={p.title}
+                    summary={p.shortSummary}
+                    image={image}
+                    imageAlt={`${p.title} hero image`}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No featured projects yet.</p>
+          )}
+          <div className="mt-6">
+            <Button variant="secondary" asChild>
+              <Link to="/projects">View all projects</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       <section className="border-t bg-secondary/40">
         <div className="container py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <Link to="/about" className="p-6 rounded-lg bg-background border hover-scale">
@@ -58,3 +111,4 @@ const Index = () => {
 };
 
 export default Index;
+
