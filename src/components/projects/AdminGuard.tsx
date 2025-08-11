@@ -49,6 +49,6 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   }, []);
 
   if (checking) return <div className="p-6">Checking authentication…</div>;
-  if (!allowed) return <Navigate to="/admin" replace />;
+  if (!allowed) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
