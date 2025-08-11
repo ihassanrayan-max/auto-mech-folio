@@ -28,7 +28,12 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
           .eq('id', user.id)
           .maybeSingle();
         const role = (profile as any)?.role as string | undefined;
-        setAllowed(role === 'admin' || role === 'editor');
+        let ok = role === 'admin' || role === 'editor';
+        if (!ok) {
+          const { data: isAdminRpc } = await supabase.rpc('is_admin');
+          ok = Boolean(isAdminRpc);
+        }
+        setAllowed(ok);
         setChecking(false);
       };
       await computeAllowed();
