@@ -11,6 +11,7 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { generateResponsiveImages } from "@/lib/image";
 import { slugify } from "@/lib/slug";
 import type { Category, ProjectRow, SiteSettings, Status } from "@/types/cms";
+import { useNavigate } from "react-router-dom";
 
 
 const categories: Category[] = ["Mechanical", "Electrical", "Software", "Mini"];
@@ -68,6 +69,7 @@ function NoIndexMeta() {
 
 export default function AdminPage() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const [view, setView] = useState<"list" | "new" | "edit" | "settings">("list");
   const [editing, setEditing] = useState<ProjectRow | null>(null);
@@ -111,8 +113,9 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
-      setAuthMode('reset');
+    if (typeof window !== 'undefined') {
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+      if (hash.get('type') === 'recovery') setAuthMode('reset');
     }
   }, []);
 
@@ -188,8 +191,9 @@ export default function AdminPage() {
     }
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return toast({ title: 'Update failed', description: error.message });
-    toast({ title: 'Password updated', description: 'You can now sign in with your new password.' });
-    window.location.href = '/admin';
+    await supabase.auth.signOut();
+    navigate('/admin');
+    toast({ title: 'Password updated', description: 'Sign in with your new password.' });
   };
   const onSave = async (payload: Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
     const now = new Date().toISOString();
@@ -254,7 +258,7 @@ export default function AdminPage() {
     <div className="container py-8">
       <SEO title="Admin Dashboard" description="Manage projects and settings" />
       <NoIndexMeta />
-      {!allowed ? (
+      {(!allowed || authMode === 'reset') ? (
         <Card className="max-w-md mx-auto">
           <CardHeader>
             <CardTitle>{authMode === 'forgot' ? 'Forgot password' : authMode === 'reset' ? 'Set new password' : 'Admin Login'}</CardTitle>
@@ -271,9 +275,8 @@ export default function AdminPage() {
                   <Input id="password" name="password" type="password" required />
                 </div>
                 <Button type="submit">Sign in</Button>
-                <div className="text-sm text-muted-foreground flex items-center gap-3 pt-2">
+                <div className="text-sm text-muted-foreground pt-2">
                   <button type="button" className="underline" onClick={() => setAuthMode('forgot')}>Forgot password</button>
-                  <a className="underline" href="mailto:ihassanrayan@gmail.com?subject=Request%20access&body=Please%20create%20an%20account%20for%20me:%20<email>">Need access?</a>
                 </div>
               </form>
             )}
