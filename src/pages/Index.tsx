@@ -58,7 +58,7 @@ const Index = () => {
         </div>
         <div className="justify-self-center">
           <div className="rounded-xl overflow-hidden shadow-[var(--shadow-elevated)]">
-            <img src={profileImg} alt="Professional portrait of the student" className="w-56 h-56 md:w-72 md:h-72 object-cover" loading="lazy" />
+            <img src={(siteSettings as any)?.hero?.photoUrl || profileImg} alt="Hero portrait" className="w-56 h-56 md:w-72 md:h-72 object-cover" loading="lazy" />
           </div>
         </div>
       </section>

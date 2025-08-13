@@ -86,13 +86,15 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [heroSubcopy, setHeroSubcopy] = useState("");
   const [heroCtaText, setHeroCtaText] = useState("");
   const [heroCtaHref, setHeroCtaHref] = useState("");
+  const [heroPhotoUrl, setHeroPhotoUrl] = useState<string>("");
   const [aboutMarkdown, setAboutMarkdown] = useState("");
+  const [aboutVideoUrl, setAboutVideoUrl] = useState<string>("");
+  const [aboutGallery, setAboutGallery] = useState<string[]>([]);
   const [skillsList, setSkillsList] = useState<{ name: string; level: number }[]>([]);
   const [contactEmail, setContactEmail] = useState("");
   const [contactLinkedin, setContactLinkedin] = useState("");
   const [contactGithub, setContactGithub] = useState("");
   const [otherLinks, setOtherLinks] = useState<{ label: string; url: string }[]>([]);
-
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     const load = async () => {
@@ -142,8 +144,11 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     setHeroSubcopy(h.subcopy || "");
     setHeroCtaText(h.ctaText || "");
     setHeroCtaHref(h.ctaHref || "");
+    setHeroPhotoUrl(h.photoUrl || "");
     const a = s.about || {};
     setAboutMarkdown(a.markdown || "");
+    setAboutVideoUrl(a.videoUrl || "");
+    setAboutGallery(Array.isArray(a.gallery) ? a.gallery : []);
     const sk = Array.isArray(s.skills) ? s.skills : [];
     setSkillsList(sk.map((it: any) => ({ name: String(it?.name || ""), level: Math.max(0, Math.min(100, Number(it?.level ?? 0))) })));
     const c = s.contact || {};
@@ -293,11 +298,62 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     try { new URL(u); return true; } catch { return false; }
   };
 
+  const uploadSingleImage = async (file: File, folder: string) => {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error } = await supabase.storage.from("media-projects").upload(path, file, { upsert: false, contentType: file.type || "image/jpeg" });
+    if (error) throw error;
+    const { data } = supabase.storage.from("media-projects").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const onUploadHero = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    try {
+      const url = await uploadSingleImage(file, 'hero');
+      setHeroPhotoUrl(url);
+      toast({ title: 'Hero photo updated' });
+    } catch (e: any) {
+      toast({ title: 'Upload failed', description: e.message ?? String(e) });
+    }
+  };
+
+  const onUploadAboutGallery = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    try {
+      const uploaded: string[] = [];
+      for (const file of Array.from(files)) {
+        const url = await uploadSingleImage(file, 'about-gallery');
+        uploaded.push(url);
+      }
+      setAboutGallery((prev) => [...prev, ...uploaded]);
+      toast({ title: 'Gallery updated', description: `${uploaded.length} image(s) uploaded` });
+    } catch (e: any) {
+      toast({ title: 'Upload failed', description: e.message ?? String(e) });
+    }
+  };
+
+  const moveGalleryItem = (idx: number, dir: -1 | 1) => {
+    setAboutGallery((prev) => {
+      const next = [...prev];
+      const newIdx = idx + dir;
+      if (newIdx < 0 || newIdx >= next.length) return prev;
+      const [item] = next.splice(idx, 1);
+      next.splice(newIdx, 0, item);
+      return next;
+    });
+  };
+
+  const removeGalleryItem = (idx: number) => {
+    setAboutGallery((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSaveSiteSettings = async () => {
     if (contactEmail && !/^([^@\s]+)@([^@\s]+)\.[^@\s]+$/.test(contactEmail)) {
       return toast({ title: "Invalid email", description: "Please enter a valid email address." });
     }
-    const urlsToCheck = [heroCtaHref, contactLinkedin, contactGithub, ...otherLinks.map((l) => l.url)];
+    const urlsToCheck = [heroCtaHref, contactLinkedin, contactGithub, aboutVideoUrl, ...otherLinks.map((l) => l.url)];
     if (urlsToCheck.some((u) => !isValidUrl(u))) {
       return toast({ title: "Invalid URL", description: "Please check all URL fields." });
     }
@@ -308,8 +364,8 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     const payload: any = {
       id: "main",
       homeFeaturedEnabled: !!homeFeaturedEnabledLocal,
-      hero: { headline: heroHeadline, subcopy: heroSubcopy, ctaText: heroCtaText, ctaHref: heroCtaHref },
-      about: { markdown: aboutMarkdown },
+      hero: { headline: heroHeadline, subcopy: heroSubcopy, ctaText: heroCtaText, ctaHref: heroCtaHref, photoUrl: heroPhotoUrl || "" },
+      about: { markdown: aboutMarkdown, gallery: aboutGallery, videoUrl: aboutVideoUrl || "" },
       skills: skillsList.map((s) => ({ name: s.name, level: Number(s.level) })),
       contact: { email: contactEmail, linkedinUrl: contactLinkedin, githubUrl: contactGithub, otherLinks },
     };
@@ -461,6 +517,20 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
                     <Label>CTA Href (URL)</Label>
                     <Input type="url" value={heroCtaHref} onChange={(e) => setHeroCtaHref(e.target.value)} placeholder="/projects" />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Hero Photo</Label>
+                    {heroPhotoUrl ? (
+                      <div className="flex items-center gap-4">
+                        <img src={heroPhotoUrl} alt="Current hero" className="w-24 h-24 object-cover rounded" />
+                        <div className="space-x-2">
+                          <Input type="file" accept="image/*" onChange={(e) => onUploadHero(e.target.files)} />
+                          <Button type="button" variant="outline" onClick={() => setHeroPhotoUrl("")}>Remove</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Input type="file" accept="image/*" onChange={(e) => onUploadHero(e.target.files)} />
+                    )}
+                  </div>
                 </section>
 
                 <section className="space-y-3">
@@ -468,6 +538,28 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
                   <div className="space-y-2">
                     <Label>Markdown</Label>
                     <Textarea value={aboutMarkdown} onChange={(e) => setAboutMarkdown(e.target.value)} rows={10} placeholder="Write your About content in Markdown" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>About Video URL (YouTube or Vimeo, optional)</Label>
+                    <Input type="url" value={aboutVideoUrl} onChange={(e) => setAboutVideoUrl(e.target.value)} placeholder="https://youtu.be/... or https://vimeo.com/..." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>About Gallery</Label>
+                    <Input type="file" accept="image/*" multiple onChange={(e) => onUploadAboutGallery(e.target.files)} />
+                    {aboutGallery.length > 0 && (
+                      <div className="grid grid-cols-3 gap-2">
+                        {aboutGallery.map((url, idx) => (
+                          <div key={url} className="relative group">
+                            <img src={url} alt={`Gallery ${idx + 1}`} className="w-full h-24 object-cover rounded" />
+                            <div className="mt-2 flex gap-2">
+                              <Button size="sm" variant="outline" onClick={() => moveGalleryItem(idx, -1)}>Up</Button>
+                              <Button size="sm" variant="outline" onClick={() => moveGalleryItem(idx, 1)}>Down</Button>
+                              <Button size="sm" variant="destructive" onClick={() => removeGalleryItem(idx)}>Delete</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </section>
 
