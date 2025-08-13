@@ -30,32 +30,39 @@ export default function Contact() {
   const githubUrl = contact.githubUrl || "https://github.com";
   const otherLinks: { label: string; url: string }[] = Array.isArray(contact.otherLinks) ? contact.otherLinks : [];
 
-  const buildMailtoLink = (to: string, subject: string, body: string, maxLen = 1800) => {
-    const make = (b: string) => `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(b)}`;
-    let currentBody = body;
-    let url = make(currentBody);
-    if (url.length <= maxLen) return { url, body: currentBody };
+  const buildComposeUrls = (to: string, subject: string, body: string, maxLen = 1800) => {
+    const truncateBody = (b: string) => {
+      if (b.length <= maxLen) return b;
+      const notice = "\n\n(truncated)";
+      const base = b;
+      // Try decreasing body length until it fits
+      for (let len = Math.min(1500, base.length); len >= 100; len -= 100) {
+        const truncated = base.slice(0, len) + notice;
+        if (truncated.length <= maxLen) return truncated;
+      }
+      return "(message too long)" + notice;
+    };
 
-    const notice = "\n\n(truncated)";
-    const base = body;
-    // Try decreasing body length until URL fits
-    for (let len = Math.min(1500, base.length); len >= 100; len -= 100) {
-      currentBody = base.slice(0, len) + notice;
-      url = make(currentBody);
-      if (url.length <= maxLen) return { url, body: currentBody };
-    }
-    currentBody = "(message too long)" + notice;
-    url = make(currentBody);
-    return { url, body: currentBody };
+    const finalBody = truncateBody(body);
+    const encodedTo = encodeURIComponent(to);
+    const encodedSubject = encodeURIComponent(subject);
+    const encodedBody = encodeURIComponent(finalBody);
+
+    return {
+      gmailApp: `googlegmail://co?to=${encodedTo}&subject=${encodedSubject}&body=${encodedBody}`,
+      gmailWeb: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodedTo}&su=${encodedSubject}&body=${encodedBody}`,
+      mailto: `mailto:${encodedTo}?subject=${encodedSubject}&body=${encodedBody}`,
+      body: finalBody
+    };
   };
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setShowFallback(false);
 
     // Validation
     const nameValid = name.trim().length >= 1 && name.trim().length <= 100;
-    const emailValid = /.+@.+\..+/.test(email.trim());
+    const emailValid = /^.+@.+\..+$/.test(email.trim());
     const messageValid = message.trim().length >= 1 && message.trim().length <= 5000;
 
     if (!nameValid) return toast({ title: "Invalid name", description: "Please enter 1–100 characters." });
@@ -65,26 +72,60 @@ export default function Contact() {
     const subject = `Inquiry from ${name || "Portfolio Visitor"}`;
     const body = `${message}\n\nFrom: ${name}\nEmail: ${email}`;
 
-    const { url } = buildMailtoLink(targetEmail, subject, body);
+    const urls = buildComposeUrls(targetEmail, subject, body);
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
 
-    // Trigger via invisible anchor
-    if (mailtoRef.current) {
-      mailtoRef.current.setAttribute("href", url);
-      mailtoRef.current.click();
-      toast({ title: "Opening your email app…", description: "Your compose window should appear shortly." });
-      // If we still have focus after a short delay, show fallback UI
+    toast({ title: "Opening your email app…", description: "Your compose window should appear shortly." });
+
+    const tryOpen = async (url: string) => {
+      return new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => resolve(false), 1000);
+        
+        if (mailtoRef.current) {
+          mailtoRef.current.setAttribute("href", url);
+          mailtoRef.current.click();
+        } else {
+          try {
+            window.location.href = url;
+          } catch {
+            clearTimeout(timeout);
+            resolve(false);
+            return;
+          }
+        }
+        
+        // Check if we still have focus after a brief delay
+        setTimeout(() => {
+          clearTimeout(timeout);
+          resolve(document.hasFocus());
+        }, 500);
+      });
+    };
+
+    let success = false;
+
+    // Try Gmail app on mobile first
+    if (isMobile) {
+      success = !(await tryOpen(urls.gmailApp));
+    }
+
+    // Try Gmail web if app didn't work or not mobile
+    if (!success) {
+      success = !(await tryOpen(urls.gmailWeb));
+    }
+
+    // Try mailto as final fallback
+    if (!success) {
+      success = !(await tryOpen(urls.mailto));
+    }
+
+    // If all failed, show fallback UI
+    if (!success) {
       setTimeout(() => {
-        if (typeof document !== "undefined" && document.hasFocus()) {
+        if (document.hasFocus()) {
           setShowFallback(true);
         }
-      }, 1500);
-    } else {
-      // Last-resort fallback: try direct navigation
-      try {
-        window.location.href = url;
-      } catch {
-        setShowFallback(true);
-      }
+      }, 100);
     }
   };
 
