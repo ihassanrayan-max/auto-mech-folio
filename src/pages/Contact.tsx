@@ -1,5 +1,5 @@
 import SEO from "@/components/SEO";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,8 @@ export default function Contact() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [showFallback, setShowFallback] = useState(false);
+  const mailtoRef = useRef<HTMLAnchorElement | null>(null);
 
   const { data: siteSettings } = useQuery({
     queryKey: ["site_settings", "main"],
@@ -23,17 +25,67 @@ export default function Contact() {
   });
 
   const contact = (siteSettings as any)?.contact || {};
-  const targetEmail = String(contact.email || "your.email@example.com");
+  const targetEmail = String(contact.email || "hassanrayan126@gmail.com");
   const linkedinUrl = contact.linkedinUrl || "https://www.linkedin.com";
   const githubUrl = contact.githubUrl || "https://github.com";
   const otherLinks: { label: string; url: string }[] = Array.isArray(contact.otherLinks) ? contact.otherLinks : [];
 
+  const buildMailtoLink = (to: string, subject: string, body: string, maxLen = 1800) => {
+    const make = (b: string) => `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(b)}`;
+    let currentBody = body;
+    let url = make(currentBody);
+    if (url.length <= maxLen) return { url, body: currentBody };
+
+    const notice = "\n\n(truncated)";
+    const base = body;
+    // Try decreasing body length until URL fits
+    for (let len = Math.min(1500, base.length); len >= 100; len -= 100) {
+      currentBody = base.slice(0, len) + notice;
+      url = make(currentBody);
+      if (url.length <= maxLen) return { url, body: currentBody };
+    }
+    currentBody = "(message too long)" + notice;
+    url = make(currentBody);
+    return { url, body: currentBody };
+  };
+
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const subject = encodeURIComponent(`Inquiry from ${name || 'Portfolio Visitor'}`);
-    const body = encodeURIComponent(`${message}\n\nFrom: ${name}\nEmail: ${email}`);
-    window.location.href = `mailto:${targetEmail}?subject=${subject}&body=${body}`;
-    toast({ title: "Thanks!", description: "Your email client is opening. Looking forward to your message." });
+    setShowFallback(false);
+
+    // Validation
+    const nameValid = name.trim().length >= 1 && name.trim().length <= 100;
+    const emailValid = /.+@.+\..+/.test(email.trim());
+    const messageValid = message.trim().length >= 1 && message.trim().length <= 5000;
+
+    if (!nameValid) return toast({ title: "Invalid name", description: "Please enter 1–100 characters." });
+    if (!emailValid) return toast({ title: "Invalid email", description: "Please enter a valid email address." });
+    if (!messageValid) return toast({ title: "Invalid message", description: "Please enter 1–5000 characters." });
+
+    const subject = `Inquiry from ${name || "Portfolio Visitor"}`;
+    const body = `${message}\n\nFrom: ${name}\nEmail: ${email}`;
+
+    const { url } = buildMailtoLink(targetEmail, subject, body);
+
+    // Trigger via invisible anchor
+    if (mailtoRef.current) {
+      mailtoRef.current.setAttribute("href", url);
+      mailtoRef.current.click();
+      toast({ title: "Opening your email app…", description: "Your compose window should appear shortly." });
+      // If we still have focus after a short delay, show fallback UI
+      setTimeout(() => {
+        if (typeof document !== "undefined" && document.hasFocus()) {
+          setShowFallback(true);
+        }
+      }, 1500);
+    } else {
+      // Last-resort fallback: try direct navigation
+      try {
+        window.location.href = url;
+      } catch {
+        setShowFallback(true);
+      }
+    }
   };
 
   return (
@@ -58,6 +110,30 @@ export default function Contact() {
             <Textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} rows={6} required />
           </div>
           <Button type="submit">Send Message</Button>
+          {/* Invisible anchor for mailto trigger */}
+          <a ref={mailtoRef} className="sr-only" aria-hidden="true" tabIndex={-1} />
+
+          {showFallback && (
+            <div className="mt-4 rounded-lg border p-4">
+              <p className="mb-3">Couldn't open your mail app.</p>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(targetEmail);
+                      toast({ title: "Copied", description: "Email address copied to clipboard." });
+                    } catch {
+                      toast({ title: "Copy failed", description: targetEmail });
+                    }
+                  }}
+                >
+                  Copy email
+                </Button>
+                <p className="text-sm text-muted-foreground">Email us at {targetEmail} with your message.</p>
+              </div>
+            </div>
+          )}
         </form>
         <aside className="space-y-4 text-muted-foreground">
           <p>Prefer social? Find me here:</p>
