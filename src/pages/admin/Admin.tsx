@@ -132,29 +132,42 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const isResetPath = window.location.pathname.endsWith('/admin/reset-password');
-      const hash = new URLSearchParams(window.location.hash.slice(1));
-      if (isResetPath || hash.get('type') === 'recovery') setAuthMode('reset');
+      const hashRaw = window.location.hash.replace(/^#/, '');
+      const combined = hashRaw.replace(/#/g, '&');
+      const hash = new URLSearchParams(combined);
+      const search = new URLSearchParams(window.location.search);
+      const isRecovery = (hash.get('type') || search.get('type')) === 'recovery';
+      if (isResetPath || isRecovery) setAuthMode('reset');
     }
   }, []);
-  // Clear the hash after showing the reset form to avoid leaving recovery state in the URL
+  // Handle recovery tokens from hash (single or double) or query string and set session
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-    const type = hash.get('type');
-    const access_token = hash.get('access_token');
-    const refresh_token = hash.get('refresh_token');
+    const hashRaw = window.location.hash.replace(/^#/, '');
+    const combined = hashRaw.replace(/#/g, '&'); // support double-hash fragments
+    const hash = new URLSearchParams(combined);
+    const search = new URLSearchParams(window.location.search);
 
-    if (type === 'recovery' && access_token && refresh_token) {
-      (async () => {
-        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-        if (!error) {
-          setAuthMode('reset');
-          setRecoveryReady(true);
-        } else {
-          toast({ title: 'Authentication error', description: error.message });
-        }
-      })();
+    const type = hash.get('type') || search.get('type');
+    const access_token = hash.get('access_token') || search.get('access_token');
+    const refresh_token = hash.get('refresh_token') || search.get('refresh_token');
+
+    if (type === 'recovery') {
+      setAuthMode('reset');
+      if (access_token && refresh_token) {
+        setRecoveryReady(false);
+        (async () => {
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (!error) {
+            setRecoveryReady(true);
+          } else {
+            toast({ title: 'Reset link expired. Please request a new one.' });
+          }
+        })();
+      } else {
+        toast({ title: 'Reset link expired. Please request a new one.' });
+      }
     }
   }, []);
 
@@ -253,28 +266,31 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
       return toast({ title: 'Passwords do not match', description: 'Please re-enter.' });
     }
 
-    // Ensure we have a valid session (in case of reload)
+    // Ensure we have a valid session (handles reloads and all URL formats)
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) {
-      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const access_token = hash.get('access_token');
-      const refresh_token = hash.get('refresh_token');
+      const hashRaw = window.location.hash.replace(/^#/, '');
+      const combined = hashRaw.replace(/#/g, '&');
+      const hash = new URLSearchParams(combined);
+      const search = new URLSearchParams(window.location.search);
+      const access_token = hash.get('access_token') || search.get('access_token');
+      const refresh_token = hash.get('refresh_token') || search.get('refresh_token');
       if (access_token && refresh_token) {
         const { error } = await supabase.auth.setSession({ access_token, refresh_token });
         if (error) {
-          return toast({ title: 'Reset link expired', description: 'Please request a new email.' });
+          return toast({ title: 'Reset link expired. Please request a new one.' });
         }
       } else {
-        return toast({ title: 'Reset link expired', description: 'Please request a new email.' });
+        return toast({ title: 'Reset link expired. Please request a new one.' });
       }
     }
 
     const { error } = await supabase.auth.updateUser({ password });
     if (error) {
-      const msg = /session|jwt|missing/i.test(error.message)
-        ? 'Reset link expired. Please request a new one.'
-        : error.message;
-      return toast({ title: 'Update failed', description: msg });
+      if (/session|jwt|missing/i.test(error.message)) {
+        return toast({ title: 'Reset link expired. Please request a new one.' });
+      }
+      return toast({ title: 'Update failed', description: error.message });
     }
 
     // Sign out and redirect
