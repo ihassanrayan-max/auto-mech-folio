@@ -34,6 +34,7 @@ const App = () => (
             <Route path="contact" element={<Contact />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="admin" element={<AdminPage />} />
+            <Route path="admin/reset-password" element={<AdminPage />} />
             <Route path="cms/projects" element={<CMSProjectsList />} />
             <Route path="cms/projects/:slug" element={<CMSProjectDetail />} />
             <Route path="*" element={<NotFound />} />

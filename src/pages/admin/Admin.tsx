@@ -130,13 +130,18 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const isResetPath = window.location.pathname.endsWith('/admin/reset-password');
       const hash = new URLSearchParams(window.location.hash.slice(1));
-      if (hash.get('type') === 'recovery') setAuthMode('reset');
+      if (isResetPath || hash.get('type') === 'recovery') setAuthMode('reset');
     }
   }, []);
   // Clear the hash after showing the reset form to avoid leaving recovery state in the URL
   useEffect(() => {
-    if (authMode === 'reset' && typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+    if (
+      authMode === 'reset' &&
+      typeof window !== 'undefined' &&
+      window.location.hash.includes('type=recovery')
+    ) {
       window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
     }
   }, [authMode]);
@@ -218,7 +223,7 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     if (!targetForm) throw new Error('Form not found');
     const form = new FormData(targetForm);
     const email = String(form.get('email') || '');
-    const redirectTo = `${window.location.origin}/admin#type=recovery`;
+    const redirectTo = `${window.location.origin}/admin/reset-password`;
     await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     toast({ title: 'Check your email', description: "If an account exists for that email, we've sent a reset link." });
     setAuthMode('signin');
