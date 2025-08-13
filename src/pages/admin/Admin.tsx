@@ -129,22 +129,26 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const isResetPath = window.location.pathname.endsWith('/admin/reset-password');
-      const hash = new URLSearchParams(window.location.hash.slice(1));
-      if (isResetPath || hash.get('type') === 'recovery') setAuthMode('reset');
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    const isResetPath = url.pathname.endsWith('/admin/reset-password');
+    const hasRecoveryHash = new URLSearchParams(url.hash.slice(1)).get('type') === 'recovery';
+    const hasCodeOrToken = url.searchParams.has('code') || url.searchParams.has('token_hash') || url.searchParams.has('access_token');
+
+    if (isResetPath || hasRecoveryHash || hasCodeOrToken) {
+      setAuthMode('reset');
+      (async () => {
+        try {
+          const { error } = await supabase.auth.exchangeCodeForSession({ currentURL: window.location.href } as any);
+          if (error && !/already/i.test(error.message)) {
+            toast({ title: 'Authentication error', description: error.message });
+          }
+        } catch {}
+        const cleanPath = isResetPath ? '/admin/reset-password' : window.location.pathname;
+        window.history.replaceState({}, document.title, cleanPath);
+      })();
     }
   }, []);
-  // Clear the hash after showing the reset form to avoid leaving recovery state in the URL
-  useEffect(() => {
-    if (
-      authMode === 'reset' &&
-      typeof window !== 'undefined' &&
-      window.location.hash.includes('type=recovery')
-    ) {
-      window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
-    }
-  }, [authMode]);
 
   // Hydrate local site settings state when settings load
   useEffect(() => {
@@ -239,11 +243,33 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     if (!password || password !== confirm) {
       return toast({ title: 'Passwords do not match', description: 'Please re-enter your new password.' });
     }
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) return toast({ title: 'Update failed', description: error.message });
-    await supabase.auth.signOut();
-    toast({ title: 'Password updated', description: 'Sign in with your new password.' });
-    window.location.href = '/admin';
+
+    try {
+      // Ensure we have a valid session from the recovery link
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        await supabase.auth.exchangeCodeForSession({ currentURL: window.location.href } as any);
+      }
+
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) return toast({ title: 'Update failed', description: error.message });
+
+      // Robust sign out and cleanup to avoid limbo states
+      try {
+        // Clean local/session storage auth keys
+        try { localStorage.removeItem('supabase.auth.token'); } catch {}
+        try {
+          Object.keys(localStorage).forEach((key) => { if (key.startsWith('supabase.auth.') || key.includes('sb-')) localStorage.removeItem(key); });
+          Object.keys(sessionStorage || {}).forEach((key) => { if (key.startsWith('supabase.auth.') || key.includes('sb-')) sessionStorage.removeItem(key); });
+        } catch {}
+        await supabase.auth.signOut({ scope: 'global' } as any);
+      } catch {}
+
+      toast({ title: 'Password updated', description: 'Sign in with your new password.' });
+      window.location.href = '/admin';
+    } catch (err: any) {
+      toast({ title: 'Update failed', description: err?.message || String(err) });
+    }
   };
   const onSave = async (payload: Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
     const now = new Date().toISOString();
