@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { Switch } from "@/components/ui/switch";
 import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { generateResponsiveImages } from "@/lib/image";
 import { slugify } from "@/lib/slug";
@@ -76,8 +77,21 @@ export default function AdminPage() {
   const { allowed, isAdmin, role, loading, userEmail } = useAuthRole();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [search, setSearch] = useState("");
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
+const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [authMode, setAuthMode] = useState<"signin"|"forgot"|"reset">("signin");
+
+  // Site settings local state
+  const [homeFeaturedEnabledLocal, setHomeFeaturedEnabledLocal] = useState<boolean>(false);
+  const [heroHeadline, setHeroHeadline] = useState("");
+  const [heroSubcopy, setHeroSubcopy] = useState("");
+  const [heroCtaText, setHeroCtaText] = useState("");
+  const [heroCtaHref, setHeroCtaHref] = useState("");
+  const [aboutMarkdown, setAboutMarkdown] = useState("");
+  const [skillsList, setSkillsList] = useState<{ name: string; level: number }[]>([]);
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactLinkedin, setContactLinkedin] = useState("");
+  const [contactGithub, setContactGithub] = useState("");
+  const [otherLinks, setOtherLinks] = useState<{ label: string; url: string }[]>([]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -118,6 +132,26 @@ export default function AdminPage() {
       if (hash.get('type') === 'recovery') setAuthMode('reset');
     }
   }, []);
+
+  // Hydrate local site settings state when settings load
+  useEffect(() => {
+    const s: any = settings || {};
+    setHomeFeaturedEnabledLocal(!!s.homeFeaturedEnabled);
+    const h = s.hero || {};
+    setHeroHeadline(h.headline || "");
+    setHeroSubcopy(h.subcopy || "");
+    setHeroCtaText(h.ctaText || "");
+    setHeroCtaHref(h.ctaHref || "");
+    const a = s.about || {};
+    setAboutMarkdown(a.markdown || "");
+    const sk = Array.isArray(s.skills) ? s.skills : [];
+    setSkillsList(sk.map((it: any) => ({ name: String(it?.name || ""), level: Math.max(0, Math.min(100, Number(it?.level ?? 0))) })));
+    const c = s.contact || {};
+    setContactEmail(c.email || "");
+    setContactLinkedin(c.linkedinUrl || "");
+    setContactGithub(c.githubUrl || "");
+    setOtherLinks(Array.isArray(c.otherLinks) ? c.otherLinks.map((l: any) => ({ label: String(l?.label || ""), url: String(l?.url || "") })) : []);
+  }, [settings]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -254,6 +288,44 @@ export default function AdminPage() {
     URL.revokeObjectURL(url);
   };
 
+  const isValidUrl = (u: string) => {
+    if (!u) return true;
+    try { new URL(u); return true; } catch { return false; }
+  };
+
+  const handleSaveSiteSettings = async () => {
+    if (contactEmail && !/^([^@\s]+)@([^@\s]+)\.[^@\s]+$/.test(contactEmail)) {
+      return toast({ title: "Invalid email", description: "Please enter a valid email address." });
+    }
+    const urlsToCheck = [heroCtaHref, contactLinkedin, contactGithub, ...otherLinks.map((l) => l.url)];
+    if (urlsToCheck.some((u) => !isValidUrl(u))) {
+      return toast({ title: "Invalid URL", description: "Please check all URL fields." });
+    }
+    if (skillsList.some((s) => !s.name.trim() || isNaN(s.level) || s.level < 0 || s.level > 100)) {
+      return toast({ title: "Invalid skills", description: "Each skill must have a name and 0–100 level." });
+    }
+
+    const payload: any = {
+      id: "main",
+      homeFeaturedEnabled: !!homeFeaturedEnabledLocal,
+      hero: { headline: heroHeadline, subcopy: heroSubcopy, ctaText: heroCtaText, ctaHref: heroCtaHref },
+      about: { markdown: aboutMarkdown },
+      skills: skillsList.map((s) => ({ name: s.name, level: Number(s.level) })),
+      contact: { email: contactEmail, linkedinUrl: contactLinkedin, githubUrl: contactGithub, otherLinks },
+    };
+
+    const { data, error } = await supabase.from("site_settings").upsert(payload, { onConflict: "id" }).select().maybeSingle();
+    if (error) return toast({ title: "Settings failed", description: error.message });
+    setSettings((data as any) ?? payload);
+    toast({ title: "Settings saved" });
+  };
+
+  const addSkill = () => setSkillsList((prev) => [...prev, { name: "", level: 50 }]);
+  const removeSkill = (idx: number) => setSkillsList((prev) => prev.filter((_, i) => i !== idx));
+
+  const addLink = () => setOtherLinks((prev) => [...prev, { label: "", url: "" }]);
+  const removeLink = (idx: number) => setOtherLinks((prev) => prev.filter((_, i) => i !== idx));
+
   return (
     <div className="container py-8">
       <SEO title="Admin Dashboard" description="Manage projects and settings" />
@@ -353,21 +425,112 @@ export default function AdminPage() {
           )}
 
           {view === "settings" && (
-            <Card className="max-w-xl">
+            <Card className="max-w-3xl">
               <CardHeader>
                 <CardTitle>Site Settings</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
+              <CardContent className="space-y-6">
+                <section className="flex items-center justify-between">
                   <div>
                     <div className="font-medium">Home Featured section</div>
-                    <div className="text-sm text-muted-foreground">Enable rendering of Featured Projects on Home if a placeholder exists.</div>
+                    <div className="text-sm text-muted-foreground">Show Featured Projects on the Home page.</div>
                   </div>
-                  <Button variant="outline" onClick={() => saveSettings(!settings?.homeFeaturedEnabled)}>
-                    {settings?.homeFeaturedEnabled ? "Enabled" : "Disabled"}
-                  </Button>
-                </div>
-                <div className="pt-2">
+                  <div className="flex items-center gap-3">
+                    <Switch checked={homeFeaturedEnabledLocal} onCheckedChange={setHomeFeaturedEnabledLocal} id="home-featured" />
+                    <Label htmlFor="home-featured">{homeFeaturedEnabledLocal ? 'Enabled' : 'Disabled'}</Label>
+                  </div>
+                </section>
+
+                <section className="space-y-3">
+                  <div className="font-medium">Hero</div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Headline</Label>
+                      <Input value={heroHeadline} onChange={(e) => setHeroHeadline(e.target.value)} placeholder="e.g., Hi, I’m Alex — Mechanical Engineering Student" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>CTA Text</Label>
+                      <Input value={heroCtaText} onChange={(e) => setHeroCtaText(e.target.value)} placeholder="View Projects" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subcopy</Label>
+                    <Textarea value={heroSubcopy} onChange={(e) => setHeroSubcopy(e.target.value)} rows={3} placeholder="Short supporting sentence." />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>CTA Href (URL)</Label>
+                    <Input type="url" value={heroCtaHref} onChange={(e) => setHeroCtaHref(e.target.value)} placeholder="/projects" />
+                  </div>
+                </section>
+
+                <section className="space-y-3">
+                  <div className="font-medium">About</div>
+                  <div className="space-y-2">
+                    <Label>Markdown</Label>
+                    <Textarea value={aboutMarkdown} onChange={(e) => setAboutMarkdown(e.target.value)} rows={10} placeholder="Write your About content in Markdown" />
+                  </div>
+                </section>
+
+                <section className="space-y-3">
+                  <div className="font-medium">Skills</div>
+                  <div className="space-y-3">
+                    {skillsList.map((s, idx) => (
+                      <div key={idx} className="grid md:grid-cols-[1fr,140px,auto] items-end gap-3">
+                        <div className="space-y-2">
+                          <Label>Name</Label>
+                          <Input value={s.name} onChange={(e) => setSkillsList((prev) => prev.map((it, i) => i === idx ? { ...it, name: e.target.value } : it))} placeholder="CAD" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Level (0–100)</Label>
+                          <Input type="number" min={0} max={100} value={s.level} onChange={(e) => setSkillsList((prev) => prev.map((it, i) => i === idx ? { ...it, level: Math.max(0, Math.min(100, Number(e.target.value || 0))) } : it))} />
+                        </div>
+                        <Button type="button" variant="outline" onClick={() => removeSkill(idx)}>Remove</Button>
+                      </div>
+                    ))}
+                    <Button type="button" variant="secondary" onClick={addSkill}>Add skill</Button>
+                  </div>
+                </section>
+
+                <section className="space-y-3">
+                  <div className="font-medium">Contact</div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="name@example.com" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>GitHub URL</Label>
+                      <Input type="url" value={contactGithub} onChange={(e) => setContactGithub(e.target.value)} placeholder="https://github.com/username" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>LinkedIn URL</Label>
+                      <Input type="url" value={contactLinkedin} onChange={(e) => setContactLinkedin(e.target.value)} placeholder="https://www.linkedin.com/in/username" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Other Links</Label>
+                    <div className="space-y-3">
+                      {otherLinks.map((l, idx) => (
+                        <div key={idx} className="grid md:grid-cols-[1fr,1fr,auto] items-end gap-3">
+                          <div className="space-y-2">
+                            <Label>Label</Label>
+                            <Input value={l.label} onChange={(e) => setOtherLinks((prev) => prev.map((it, i) => i === idx ? { ...it, label: e.target.value } : it))} placeholder="Portfolio" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>URL</Label>
+                            <Input type="url" value={l.url} onChange={(e) => setOtherLinks((prev) => prev.map((it, i) => i === idx ? { ...it, url: e.target.value } : it))} placeholder="https://..." />
+                          </div>
+                          <Button type="button" variant="outline" onClick={() => removeLink(idx)}>Remove</Button>
+                        </div>
+                      ))}
+                      <Button type="button" variant="secondary" onClick={addLink}>Add link</Button>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="flex items-center gap-3 pt-2">
+                  <Button onClick={handleSaveSiteSettings}>Save Settings</Button>
                   <Button variant="secondary" onClick={exportBackup}>Export Backup (JSON)</Button>
                 </div>
               </CardContent>

@@ -24,8 +24,32 @@ export type ProjectRow = {
   updatedAt: string; // ISO
 };
 
+export type SiteHero = {
+  headline: string;
+  subcopy?: string;
+  ctaText?: string;
+  ctaHref?: string;
+};
+
+export type SiteAbout = {
+  markdown: string;
+};
+
+export type SkillItem = { name: string; level: number };
+
+export type SiteContact = {
+  email?: string;
+  linkedinUrl?: string;
+  githubUrl?: string;
+  otherLinks?: { label: string; url: string }[];
+};
+
 export type SiteSettings = {
   id: string; // singleton id e.g., 'main'
   homeFeaturedEnabled: boolean;
   updatedAt: string;
+  hero?: SiteHero;
+  about?: SiteAbout;
+  skills?: SkillItem[];
+  contact?: SiteContact;
 };

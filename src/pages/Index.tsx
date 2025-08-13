@@ -24,6 +24,15 @@ const Index = () => {
     },
   });
 
+  const { data: siteSettings } = useQuery({
+    queryKey: ["site_settings", "main"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("site_settings").select("*").eq("id", "main").maybeSingle();
+      if (error) throw error;
+      return data as any;
+    },
+  });
+
   return (
     <main>
       <SEO
@@ -38,12 +47,12 @@ const Index = () => {
       />
       <section className="container py-16 md:py-24 grid md:grid-cols-[1.2fr,0.8fr] gap-10 items-center">
         <div className="space-y-6">
-          <h1 className="font-heading text-4xl md:text-5xl font-extrabold leading-tight">Hi, I’m Alex Chen — Mechanical Engineering Student</h1>
+          <h1 className="font-heading text-4xl md:text-5xl font-extrabold leading-tight">{(siteSettings as any)?.hero?.headline || "Hi, I’m Alex Chen — Mechanical Engineering Student"}</h1>
           <p className="text-lg text-muted-foreground max-w-prose">
-            I design and build efficient mechanical systems with a focus on robotics, structural analysis, and clean, manufacturable designs.
+            {(siteSettings as any)?.hero?.subcopy || "I design and build efficient mechanical systems with a focus on robotics, structural analysis, and clean, manufacturable designs."}
           </p>
           <div className="flex flex-wrap gap-3">
-            <Button asChild><Link to="/projects">View Projects</Link></Button>
+            <Button asChild><Link to={(siteSettings as any)?.hero?.ctaHref || "/projects"}>{(siteSettings as any)?.hero?.ctaText || "View Projects"}</Link></Button>
             <Button variant="secondary" asChild><Link to="/skills">Explore Skills</Link></Button>
           </div>
         </div>
@@ -54,40 +63,42 @@ const Index = () => {
         </div>
       </section>
 
-      <section className="border-t">
-        <div className="container py-12">
-          <h2 className="font-heading text-2xl font-semibold mb-6">Featured Projects</h2>
-          {isLoading ? (
-            <p>Loading featured projects…</p>
-          ) : featured && featured.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {featured.map((p) => {
-                const image = (p.media as any)?.images?.[0] || "/placeholder.svg";
-                return (
-                  <ProjectCard
-                    key={p.slug}
-                    slug={p.slug}
-                    title={p.title}
-                    summary={p.shortSummary}
-                    image={image}
-                    imageAlt={`${p.title} hero image`}
-                    category={p.category as any}
-                    status={p.status as any}
-                    tags={p.tags}
-                  />
-                );
-              })}
+      {(siteSettings as any)?.homeFeaturedEnabled ? (
+        <section className="border-t">
+          <div className="container py-12">
+            <h2 className="font-heading text-2xl font-semibold mb-6">Featured Projects</h2>
+            {isLoading ? (
+              <p>Loading featured projects…</p>
+            ) : featured && featured.length > 0 ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {featured.map((p) => {
+                  const image = (p.media as any)?.images?.[0] || "/placeholder.svg";
+                  return (
+                    <ProjectCard
+                      key={p.slug}
+                      slug={p.slug}
+                      title={p.title}
+                      summary={p.shortSummary}
+                      image={image}
+                      imageAlt={`${p.title} hero image`}
+                      category={p.category as any}
+                      status={p.status as any}
+                      tags={p.tags}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No featured projects yet.</p>
+            )}
+            <div className="mt-6">
+              <Button variant="secondary" asChild>
+                <Link to="/projects">View all projects</Link>
+              </Button>
             </div>
-          ) : (
-            <p className="text-muted-foreground">No featured projects yet.</p>
-          )}
-          <div className="mt-6">
-            <Button variant="secondary" asChild>
-              <Link to="/projects">View all projects</Link>
-            </Button>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="border-t bg-secondary/40">
         <div className="container py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-6">

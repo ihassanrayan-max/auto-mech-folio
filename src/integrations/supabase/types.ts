@@ -157,18 +157,30 @@ export type Database = {
       }
       site_settings: {
         Row: {
+          about: Json
+          contact: Json
+          hero: Json
           homeFeaturedEnabled: boolean
           id: string
+          skills: Json
           updatedAt: string
         }
         Insert: {
+          about?: Json
+          contact?: Json
+          hero?: Json
           homeFeaturedEnabled?: boolean
           id: string
+          skills?: Json
           updatedAt?: string
         }
         Update: {
+          about?: Json
+          contact?: Json
+          hero?: Json
           homeFeaturedEnabled?: boolean
           id?: string
+          skills?: Json
           updatedAt?: string
         }
         Relationships: []
