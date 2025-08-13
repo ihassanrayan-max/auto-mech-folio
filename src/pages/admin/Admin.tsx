@@ -134,6 +134,12 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
       if (hash.get('type') === 'recovery') setAuthMode('reset');
     }
   }, []);
+  // Clear the hash after showing the reset form to avoid leaving recovery state in the URL
+  useEffect(() => {
+    if (authMode === 'reset' && typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+    }
+  }, [authMode]);
 
   // Hydrate local site settings state when settings load
   useEffect(() => {
@@ -212,7 +218,7 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     if (!targetForm) throw new Error('Form not found');
     const form = new FormData(targetForm);
     const email = String(form.get('email') || '');
-    const redirectTo = `${window.location.origin}/admin`;
+    const redirectTo = `${window.location.origin}/admin#type=recovery`;
     await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     toast({ title: 'Check your email', description: "If an account exists for that email, we've sent a reset link." });
     setAuthMode('signin');
@@ -231,8 +237,8 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return toast({ title: 'Update failed', description: error.message });
     await supabase.auth.signOut();
-    navigate('/admin');
     toast({ title: 'Password updated', description: 'Sign in with your new password.' });
+    window.location.href = '/admin';
   };
   const onSave = async (payload: Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
     const now = new Date().toISOString();
