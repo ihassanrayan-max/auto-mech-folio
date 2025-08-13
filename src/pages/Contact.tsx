@@ -50,6 +50,7 @@ export default function Contact() {
 
     return {
       gmailApp: `googlegmail://co?to=${encodedTo}&subject=${encodedSubject}&body=${encodedBody}`,
+      gmailIntent: `intent://co?to=${encodedTo}&subject=${encodedSubject}&body=${encodedBody}#Intent;scheme=googlegmail;package=com.google.android.gm;end`,
       gmailWeb: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodedTo}&su=${encodedSubject}&body=${encodedBody}`,
       mailto: `mailto:${encodedTo}?subject=${encodedSubject}&body=${encodedBody}`,
       body: finalBody
@@ -77,29 +78,47 @@ export default function Contact() {
 
     toast({ title: "Opening your email app…", description: "Your compose window should appear shortly." });
 
-    const tryOpen = async (url: string) => {
+    const tryOpen = async (url: string, useNewTab = false) => {
       return new Promise<boolean>((resolve) => {
-        const timeout = setTimeout(() => resolve(false), 1000);
+        const timeout = setTimeout(() => resolve(false), 1500);
+        let resolved = false;
+        
+        const handleVisibilityChange = () => {
+          if (document.visibilityState === 'hidden' && !resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            resolve(true);
+          }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
         
         if (mailtoRef.current) {
           mailtoRef.current.setAttribute("href", url);
-          mailtoRef.current.click();
-        } else {
-          try {
-            window.location.href = url;
-          } catch {
-            clearTimeout(timeout);
-            resolve(false);
-            return;
+          if (useNewTab) {
+            mailtoRef.current.setAttribute("target", "_blank");
+            mailtoRef.current.setAttribute("rel", "noopener");
           }
+          mailtoRef.current.click();
         }
         
-        // Check if we still have focus after a brief delay
         setTimeout(() => {
-          clearTimeout(timeout);
-          resolve(document.hasFocus());
-        }, 500);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            resolve(document.hasFocus());
+          }
+        }, 1000);
       });
+    };
+
+    const openGmailWeb = () => {
+      const subject = `Inquiry from ${name || "Portfolio Visitor"}`;
+      const body = `${message}\n\nFrom: ${name}\nEmail: ${email}`;
+      const urls = buildComposeUrls(targetEmail, subject, body);
+      window.open(urls.gmailWeb, '_blank', 'noopener');
     };
 
     let success = false;
@@ -107,11 +126,16 @@ export default function Contact() {
     // Try Gmail app on mobile first
     if (isMobile) {
       success = !(await tryOpen(urls.gmailApp));
+      
+      // Try Android intent fallback
+      if (!success && /Android/i.test(navigator.userAgent)) {
+        success = !(await tryOpen(urls.gmailIntent));
+      }
     }
 
-    // Try Gmail web if app didn't work or not mobile
+    // Try Gmail web in new tab
     if (!success) {
-      success = !(await tryOpen(urls.gmailWeb));
+      success = !(await tryOpen(urls.gmailWeb, true));
     }
 
     // Try mailto as final fallback
