@@ -30,30 +30,34 @@ export default function Contact() {
   const githubUrl = contact.githubUrl || "https://github.com";
   const otherLinks: { label: string; url: string }[] = Array.isArray(contact.otherLinks) ? contact.otherLinks : [];
 
-  const buildComposeUrls = (to: string, subject: string, body: string, maxLen = 1800) => {
-    const truncateBody = (b: string) => {
-      if (b.length <= maxLen) return b;
-      const notice = "\n\n(truncated)";
-      const base = b;
-      // Try decreasing body length until it fits
-      for (let len = Math.min(1500, base.length); len >= 100; len -= 100) {
-        const truncated = base.slice(0, len) + notice;
-        if (truncated.length <= maxLen) return truncated;
-      }
-      return "(message too long)" + notice;
-    };
-
-    const finalBody = truncateBody(body);
+  const buildMailtoUrl = (to: string, name: string, email: string, message: string, maxLen = 1800) => {
+    const subject = `Portfolio message from ${name}`;
+    const body = `From: ${name} (${email})\n\nMessage:\n${message}`;
+    
     const encodedTo = encodeURIComponent(to);
     const encodedSubject = encodeURIComponent(subject);
-    const encodedBody = encodeURIComponent(finalBody);
-
+    
+    // Build full URL to check length
+    let encodedBody = encodeURIComponent(body);
+    let mailtoUrl = `mailto:${encodedTo}?subject=${encodedSubject}&body=${encodedBody}`;
+    
+    // Truncate body if URL is too long
+    if (mailtoUrl.length > maxLen) {
+      const notice = "\n\n(truncated)";
+      const available = maxLen - `mailto:${encodedTo}?subject=${encodedSubject}&body=`.length - encodeURIComponent(notice).length;
+      
+      // Try decreasing body length until it fits
+      for (let len = Math.min(1500, body.length); len >= 100; len -= 100) {
+        const truncated = body.slice(0, len) + notice;
+        encodedBody = encodeURIComponent(truncated);
+        mailtoUrl = `mailto:${encodedTo}?subject=${encodedSubject}&body=${encodedBody}`;
+        if (mailtoUrl.length <= maxLen) break;
+      }
+    }
+    
     return {
-      gmailApp: `googlegmail://co?to=${encodedTo}&subject=${encodedSubject}&body=${encodedBody}`,
-      gmailIntent: `intent://co?to=${encodedTo}&subject=${encodedSubject}&body=${encodedBody}#Intent;scheme=googlegmail;package=com.google.android.gm;end`,
-      gmailWeb: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodedTo}&su=${encodedSubject}&body=${encodedBody}`,
-      mailto: `mailto:${encodedTo}?subject=${encodedSubject}&body=${encodedBody}`,
-      body: finalBody
+      mailto: mailtoUrl,
+      gmailWeb: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodedTo}&su=${encodedSubject}&body=${encodedBody}`
     };
   };
 
@@ -70,86 +74,61 @@ export default function Contact() {
     if (!emailValid) return toast({ title: "Invalid email", description: "Please enter a valid email address." });
     if (!messageValid) return toast({ title: "Invalid message", description: "Please enter 1–5000 characters." });
 
-    const subject = `Inquiry from ${name || "Portfolio Visitor"}`;
-    const body = `${message}\n\nFrom: ${name}\nEmail: ${email}`;
-
-    const urls = buildComposeUrls(targetEmail, subject, body);
-    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    const urls = buildMailtoUrl(targetEmail, name.trim(), email.trim(), message.trim());
 
     toast({ title: "Opening your email app…", description: "Your compose window should appear shortly." });
 
-    const tryOpen = async (url: string, useNewTab = false) => {
-      return new Promise<boolean>((resolve) => {
-        const timeout = setTimeout(() => resolve(false), 1500);
-        let resolved = false;
-        
-        const handleVisibilityChange = () => {
-          if (document.visibilityState === 'hidden' && !resolved) {
-            resolved = true;
-            clearTimeout(timeout);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            resolve(true);
-          }
-        };
-        
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        
-        if (mailtoRef.current) {
-          mailtoRef.current.setAttribute("href", url);
-          if (useNewTab) {
-            mailtoRef.current.setAttribute("target", "_blank");
-            mailtoRef.current.setAttribute("rel", "noopener");
-          }
-          mailtoRef.current.click();
-        }
-        
-        setTimeout(() => {
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timeout);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            resolve(document.hasFocus());
-          }
-        }, 1000);
-      });
-    };
-
-    const openGmailWeb = () => {
-      const subject = `Inquiry from ${name || "Portfolio Visitor"}`;
-      const body = `${message}\n\nFrom: ${name}\nEmail: ${email}`;
-      const urls = buildComposeUrls(targetEmail, subject, body);
-      window.open(urls.gmailWeb, '_blank', 'noopener');
-    };
-
+    // Single mailto attempt with smart detection
     let success = false;
+    let resolved = false;
 
-    // Try Gmail app on mobile first
-    if (isMobile) {
-      success = !(await tryOpen(urls.gmailApp));
-      
-      // Try Android intent fallback
-      if (!success && /Android/i.test(navigator.userAgent)) {
-        success = !(await tryOpen(urls.gmailIntent));
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        // Assume blocked if still visible after timeout
+        setShowFallback(true);
       }
-    }
+    }, 1500);
 
-    // Try Gmail web in new tab
-    if (!success) {
-      success = !(await tryOpen(urls.gmailWeb, true));
-    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && !resolved) {
+        resolved = true;
+        success = true;
+        clearTimeout(timeout);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('blur', handleBlur);
+      }
+    };
 
-    // Try mailto as final fallback
-    if (!success) {
-      success = !(await tryOpen(urls.mailto));
-    }
+    const handleBlur = () => {
+      if (!resolved) {
+        resolved = true;
+        success = true;
+        clearTimeout(timeout);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('blur', handleBlur);
+      }
+    };
 
-    // If all failed, show fallback UI
-    if (!success) {
-      setTimeout(() => {
-        if (document.hasFocus()) {
-          setShowFallback(true);
-        }
-      }, 100);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleBlur);
+
+    // Trigger mailto
+    if (mailtoRef.current) {
+      mailtoRef.current.setAttribute("href", urls.mailto);
+      mailtoRef.current.removeAttribute("target");
+      mailtoRef.current.removeAttribute("rel");
+      mailtoRef.current.click();
+    }
+  };
+
+  const openGmailWeb = () => {
+    const urls = buildMailtoUrl(targetEmail, name.trim(), email.trim(), message.trim());
+    if (mailtoRef.current) {
+      mailtoRef.current.setAttribute("href", urls.gmailWeb);
+      mailtoRef.current.setAttribute("target", "_blank");
+      mailtoRef.current.setAttribute("rel", "noopener");
+      mailtoRef.current.click();
     }
   };
 
@@ -181,7 +160,7 @@ export default function Contact() {
           {showFallback && (
             <div className="mt-4 rounded-lg border p-4">
               <p className="mb-3">Couldn't open your mail app.</p>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Button
                   type="button"
                   onClick={async () => {
@@ -195,8 +174,15 @@ export default function Contact() {
                 >
                   Copy email
                 </Button>
-                <p className="text-sm text-muted-foreground">Email us at {targetEmail} with your message.</p>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={openGmailWeb}
+                >
+                  Open Gmail (web)
+                </Button>
               </div>
+              <p className="text-sm text-muted-foreground mt-3">Email us at {targetEmail} with your message.</p>
             </div>
           )}
         </form>
