@@ -11,7 +11,7 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabaseClient";
 import { generateResponsiveImages } from "@/lib/image";
 import { slugify } from "@/lib/slug";
 import type { Category, ProjectRow, SiteSettings, Status } from "@/types/cms";
-import { useNavigate } from "react-router-dom";
+
 
 const categories: Category[] = ["Mechanical", "Electrical", "Software", "Mini"];
 const statuses: Status[] = ["In Progress", "Completed"];
@@ -68,7 +68,7 @@ function NoIndexMeta() {
 
 export default function AdminPage() {
   const { toast } = useToast();
-  const navigate = useNavigate();
+  
   const [view, setView] = useState<"list" | "new" | "edit" | "settings">("list");
   const [editing, setEditing] = useState<ProjectRow | null>(null);
   const { allowed, isAdmin, role, loading, userEmail } = useAuthRole();
@@ -146,14 +146,19 @@ export default function AdminPage() {
       Object.keys(localStorage).forEach((key) => {
         if (key.startsWith('supabase.auth.') || key.includes('sb-')) localStorage.removeItem(key);
       });
+      Object.keys(sessionStorage || {}).forEach((key) => {
+        if (key.startsWith('supabase.auth.') || key.includes('sb-')) sessionStorage.removeItem(key);
+      });
       try { await supabase.auth.signOut({ scope: 'global' } as any); } catch {}
 
-      const form = new FormData(e.currentTarget);
-      const email = String(form.get("email") || "");
-      const password = String(form.get("password") || "");
+      const targetForm = e.currentTarget instanceof HTMLFormElement ? e.currentTarget : ((e as any).target?.closest?.('form') ?? null);
+      if (!targetForm) throw new Error('Form not found');
+      const form = new FormData(targetForm);
+      const email = String(form.get('email') || '');
+      const password = String(form.get('password') || '');
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return toast({ title: "Login failed", description: error.message });
-      navigate('/admin');
+      if (error) return toast({ title: 'Login failed', description: error.message });
+      window.location.href = '/admin';
     } catch (err: any) {
       toast({ title: 'Login error', description: err.message || String(err) });
     }
@@ -161,9 +166,11 @@ export default function AdminPage() {
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const email = String(form.get("email") || "");
-    const password = String(form.get("password") || "");
+    const targetForm = e.currentTarget instanceof HTMLFormElement ? e.currentTarget : ((e as any).target?.closest?.('form') ?? null);
+    if (!targetForm) throw new Error('Form not found');
+    const form = new FormData(targetForm);
+    const email = String(form.get('email') || '');
+    const password = String(form.get('password') || '');
     const redirectTo = `${window.location.origin}/admin`;
     const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
     if (error) return toast({ title: 'Sign up failed', description: error.message });
@@ -173,8 +180,10 @@ export default function AdminPage() {
 
   const handleResetRequest = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const email = String(form.get("email") || "");
+    const targetForm = e.currentTarget instanceof HTMLFormElement ? e.currentTarget : ((e as any).target?.closest?.('form') ?? null);
+    if (!targetForm) throw new Error('Form not found');
+    const form = new FormData(targetForm);
+    const email = String(form.get('email') || '');
     const redirectTo = `${window.location.origin}/admin`;
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     if (error) return toast({ title: 'Reset failed', description: error.message });
@@ -184,12 +193,14 @@ export default function AdminPage() {
 
   const handlePasswordReset = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const form = new FormData(e.currentTarget);
-    const password = String(form.get("password") || "");
+    const targetForm = e.currentTarget instanceof HTMLFormElement ? e.currentTarget : ((e as any).target?.closest?.('form') ?? null);
+    if (!targetForm) throw new Error('Form not found');
+    const form = new FormData(targetForm);
+    const password = String(form.get('password') || '');
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return toast({ title: 'Update failed', description: error.message });
     toast({ title: 'Password updated', description: 'You can now continue.' });
-    navigate('/admin');
+    window.location.href = '/admin';
   };
   const onSave = async (payload: Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
     const now = new Date().toISOString();
