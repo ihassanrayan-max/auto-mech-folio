@@ -79,6 +79,7 @@ export default function AdminPage() {
   const [search, setSearch] = useState("");
 const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [authMode, setAuthMode] = useState<"signin"|"forgot"|"reset">("signin");
+  const [recoveryReady, setRecoveryReady] = useState(false);
 
   // Site settings local state
   const [homeFeaturedEnabledLocal, setHomeFeaturedEnabledLocal] = useState<boolean>(false);
@@ -137,14 +138,25 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
   }, []);
   // Clear the hash after showing the reset form to avoid leaving recovery state in the URL
   useEffect(() => {
-    if (
-      authMode === 'reset' &&
-      typeof window !== 'undefined' &&
-      window.location.hash.includes('type=recovery')
-    ) {
-      window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+    if (typeof window === 'undefined') return;
+
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const type = hash.get('type');
+    const access_token = hash.get('access_token');
+    const refresh_token = hash.get('refresh_token');
+
+    if (type === 'recovery' && access_token && refresh_token) {
+      (async () => {
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (!error) {
+          setAuthMode('reset');
+          setRecoveryReady(true);
+        } else {
+          toast({ title: 'Authentication error', description: error.message });
+        }
+      })();
     }
-  }, [authMode]);
+  }, []);
 
   // Hydrate local site settings state when settings load
   useEffect(() => {
@@ -223,7 +235,7 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     if (!targetForm) throw new Error('Form not found');
     const form = new FormData(targetForm);
     const email = String(form.get('email') || '');
-    const redirectTo = `${window.location.origin}/admin/reset-password`;
+    const redirectTo = `${window.location.origin}/admin#type=recovery`;
     await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     toast({ title: 'Check your email', description: "If an account exists for that email, we've sent a reset link." });
     setAuthMode('signin');
@@ -236,14 +248,39 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     const form = new FormData(targetForm);
     const password = String(form.get('password') || '');
     const confirm = String(form.get('confirm') || '');
+
     if (!password || password !== confirm) {
-      return toast({ title: 'Passwords do not match', description: 'Please re-enter your new password.' });
+      return toast({ title: 'Passwords do not match', description: 'Please re-enter.' });
     }
+
+    // Ensure we have a valid session (in case of reload)
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) {
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const access_token = hash.get('access_token');
+      const refresh_token = hash.get('refresh_token');
+      if (access_token && refresh_token) {
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (error) {
+          return toast({ title: 'Reset link expired', description: 'Please request a new email.' });
+        }
+      } else {
+        return toast({ title: 'Reset link expired', description: 'Please request a new email.' });
+      }
+    }
+
     const { error } = await supabase.auth.updateUser({ password });
-    if (error) return toast({ title: 'Update failed', description: error.message });
-    await supabase.auth.signOut();
+    if (error) {
+      const msg = /session|jwt|missing/i.test(error.message)
+        ? 'Reset link expired. Please request a new one.'
+        : error.message;
+      return toast({ title: 'Update failed', description: msg });
+    }
+
+    // Sign out and redirect
+    try { await supabase.auth.signOut({ scope: 'global' } as any); } catch {}
     toast({ title: 'Password updated', description: 'Sign in with your new password.' });
-    window.location.href = '/admin';
+    window.location.replace('/admin');
   };
   const onSave = async (payload: Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
     const now = new Date().toISOString();
@@ -431,7 +468,10 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
                 </div>
               </form>
             )}
-            {authMode === 'reset' && (
+            {authMode === 'reset' && !recoveryReady && (
+              <div className="text-sm text-muted-foreground">Verifying reset link…</div>
+            )}
+            {authMode === 'reset' && recoveryReady && (
               <form onSubmit={handlePasswordReset} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="np-password">New password</Label>
