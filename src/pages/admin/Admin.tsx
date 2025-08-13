@@ -75,7 +75,7 @@ export default function AdminPage() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [search, setSearch] = useState("");
   const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [authMode, setAuthMode] = useState<"signin"|"signup"|"forgot"|"reset">("signin");
+  const [authMode, setAuthMode] = useState<"signin"|"forgot"|"reset">("signin");
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -164,20 +164,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const targetForm = e.currentTarget instanceof HTMLFormElement ? e.currentTarget : ((e as any).target?.closest?.('form') ?? null);
-    if (!targetForm) throw new Error('Form not found');
-    const form = new FormData(targetForm);
-    const email = String(form.get('email') || '');
-    const password = String(form.get('password') || '');
-    const redirectTo = `${window.location.origin}/admin`;
-    const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
-    if (error) return toast({ title: 'Sign up failed', description: error.message });
-    toast({ title: 'Check your email', description: 'Confirm your email to complete sign up.' });
-    setAuthMode('signin');
-  };
-
   const handleResetRequest = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const targetForm = e.currentTarget instanceof HTMLFormElement ? e.currentTarget : ((e as any).target?.closest?.('form') ?? null);
@@ -185,9 +171,8 @@ export default function AdminPage() {
     const form = new FormData(targetForm);
     const email = String(form.get('email') || '');
     const redirectTo = `${window.location.origin}/admin`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    if (error) return toast({ title: 'Reset failed', description: error.message });
-    toast({ title: 'Email sent', description: 'Check your inbox for the reset link.' });
+    await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    toast({ title: 'Check your email', description: "If an account exists for that email, we've sent a reset link." });
     setAuthMode('signin');
   };
 
@@ -197,9 +182,13 @@ export default function AdminPage() {
     if (!targetForm) throw new Error('Form not found');
     const form = new FormData(targetForm);
     const password = String(form.get('password') || '');
+    const confirm = String(form.get('confirm') || '');
+    if (!password || password !== confirm) {
+      return toast({ title: 'Passwords do not match', description: 'Please re-enter your new password.' });
+    }
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return toast({ title: 'Update failed', description: error.message });
-    toast({ title: 'Password updated', description: 'You can now continue.' });
+    toast({ title: 'Password updated', description: 'You can now sign in with your new password.' });
     window.location.href = '/admin';
   };
   const onSave = async (payload: Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string }) => {
@@ -268,7 +257,7 @@ export default function AdminPage() {
       {!allowed ? (
         <Card className="max-w-md mx-auto">
           <CardHeader>
-            <CardTitle>{authMode === 'signup' ? 'Create account' : authMode === 'forgot' ? 'Forgot password' : authMode === 'reset' ? 'Set new password' : 'Admin Login'}</CardTitle>
+            <CardTitle>{authMode === 'forgot' ? 'Forgot password' : authMode === 'reset' ? 'Set new password' : 'Admin Login'}</CardTitle>
           </CardHeader>
           <CardContent>
             {authMode === 'signin' && (
@@ -282,26 +271,9 @@ export default function AdminPage() {
                   <Input id="password" name="password" type="password" required />
                 </div>
                 <Button type="submit">Sign in</Button>
-                <div className="text-sm text-muted-foreground flex gap-3 pt-2">
-                  <button type="button" className="underline" onClick={() => setAuthMode('signup')}>Sign up</button>
+                <div className="text-sm text-muted-foreground flex items-center gap-3 pt-2">
                   <button type="button" className="underline" onClick={() => setAuthMode('forgot')}>Forgot password</button>
-                </div>
-                <p className="text-xs text-muted-foreground">Note: New accounts default to Editor access. Admin can upgrade your role.</p>
-              </form>
-            )}
-            {authMode === 'signup' && (
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="su-email">Email</Label>
-                  <Input id="su-email" name="email" type="email" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="su-password">Password</Label>
-                  <Input id="su-password" name="password" type="password" required />
-                </div>
-                <Button type="submit">Create account</Button>
-                <div className="text-sm text-muted-foreground pt-2">
-                  <button type="button" className="underline" onClick={() => setAuthMode('signin')}>Back to sign in</button>
+                  <a className="underline" href="mailto:ihassanrayan@gmail.com?subject=Request%20access&body=Please%20create%20an%20account%20for%20me:%20<email>">Need access?</a>
                 </div>
               </form>
             )}
@@ -322,6 +294,10 @@ export default function AdminPage() {
                 <div className="space-y-2">
                   <Label htmlFor="np-password">New password</Label>
                   <Input id="np-password" name="password" type="password" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="np-confirm">Confirm new password</Label>
+                  <Input id="np-confirm" name="confirm" type="password" required />
                 </div>
                 <Button type="submit">Update password</Button>
               </form>
