@@ -16,6 +16,7 @@ const Index = () => {
         .select("*")
         .eq("featured", true)
         .eq("published", true)
+        .eq("isVisible", true)
         .order("priority", { ascending: false })
         .order("createdAt", { ascending: false })
         .limit(3);

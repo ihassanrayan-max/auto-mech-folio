@@ -17,6 +17,7 @@ export default function Projects() {
         .from("projects")
         .select("*")
         .eq("published", true)
+        .eq("isVisible", true)
         .order("priority", { ascending: false })
         .order("createdAt", { ascending: false });
       if (error) throw error;

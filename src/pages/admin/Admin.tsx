@@ -716,6 +716,7 @@ function ProjectForm({ initial, onSave }: { initial?: any; onSave: (p: any) => v
   const [videoUrl, setVideoUrl] = useState<string>(initial?.media?.videoUrl ?? "");
   const [priority, setPriority] = useState<number>(initial?.priority ?? 0);
   const [featured, setFeatured] = useState<boolean>(initial?.featured ?? false);
+  const [isVisible, setIsVisible] = useState<boolean>(initial?.isVisible ?? true);
   const [images, setImages] = useState<string[]>(initial?.media?.images ?? []);
   const [uploading, setUploading] = useState(false);
 
@@ -781,6 +782,7 @@ function ProjectForm({ initial, onSave }: { initial?: any; onSave: (p: any) => v
       externalLinks: externalLinks ? externalLinks.split(",").map((t) => t.trim()).filter(Boolean) : [],
       slug: baseSlug,
       featured,
+      isVisible,
       priority: Number(priority) || 0,
     } as Omit<ProjectRow, "id" | "createdAt" | "updatedAt"> & { id?: string };
     await onSave(payload);
@@ -847,6 +849,13 @@ function ProjectForm({ initial, onSave }: { initial?: any; onSave: (p: any) => v
                   <input id="featured" type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
                   <Label htmlFor="featured">Show in Featured</Label>
                 </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Publicly Visible</Label>
+              <div className="flex items-center gap-3">
+                <Switch id="isVisible" checked={isVisible} onCheckedChange={setIsVisible} />
+                <Label htmlFor="isVisible">Show this project on the live site</Label>
               </div>
             </div>
           </div>

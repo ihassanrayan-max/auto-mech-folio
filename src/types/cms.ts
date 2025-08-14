@@ -19,6 +19,7 @@ export type ProjectRow = {
   externalLinks: string[];
   slug: string;
   featured: boolean;
+  isVisible: boolean;
   priority: number;
   createdAt: string; // ISO
   updatedAt: string; // ISO

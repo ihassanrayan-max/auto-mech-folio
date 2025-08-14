@@ -102,6 +102,7 @@ export type Database = {
           featured: boolean
           githubUrl: string | null
           id: string
+          isVisible: boolean
           longDescription: string | null
           media: Json
           priority: number
@@ -122,6 +123,7 @@ export type Database = {
           featured?: boolean
           githubUrl?: string | null
           id?: string
+          isVisible?: boolean
           longDescription?: string | null
           media?: Json
           priority?: number
@@ -142,6 +144,7 @@ export type Database = {
           featured?: boolean
           githubUrl?: string | null
           id?: string
+          isVisible?: boolean
           longDescription?: string | null
           media?: Json
           priority?: number
