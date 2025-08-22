@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import SEO from "@/components/SEO";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -718,6 +719,9 @@ function ProjectForm({ initial, onSave }: { initial?: any; onSave: (p: any) => v
   const [featured, setFeatured] = useState<boolean>(initial?.featured ?? false);
   const [isVisible, setIsVisible] = useState<boolean>(initial?.isVisible ?? true);
   const [images, setImages] = useState<string[]>(initial?.media?.images ?? []);
+  const [videos, setVideos] = useState<any[]>(initial?.media?.videos ?? []);
+  const [cadFiles, setCadFiles] = useState<any[]>(initial?.media?.cad ?? []);
+  const [driveUrl, setDriveUrl] = useState<string>(initial?.media?.driveUrl ?? "");
   const [uploading, setUploading] = useState(false);
 
   const slugBase = slugify(title || initial?.title || "");
@@ -761,6 +765,97 @@ function ProjectForm({ initial, onSave }: { initial?: any; onSave: (p: any) => v
     }
   };
 
+  const onUploadVideos = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const baseSlug = await ensureUniqueSlug(slugBase);
+      const uploaded: any[] = [];
+      
+      for (const file of Array.from(files)) {
+        if (file.size > 200 * 1024 * 1024) {
+          toast({ title: "Large file warning", description: `${file.name} is over 200MB - may cause slow loading` });
+        }
+        
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'mp4';
+        const mimeMap: any = { mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime' };
+        const mime = mimeMap[ext] || 'video/mp4';
+        
+        const path = `videos/${baseSlug}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+        const { error } = await supabase.storage.from("media-projects").upload(path, file, { 
+          upsert: false, 
+          contentType: mime 
+        });
+        if (error) throw error;
+        
+        const { data } = supabase.storage.from("media-projects").getPublicUrl(path);
+        uploaded.push({
+          url: data.publicUrl,
+          filename: file.name,
+          mime
+        });
+      }
+      
+      setVideos((prev) => [...prev, ...uploaded]);
+      toast({ title: "Videos uploaded", description: `${files.length} video(s) uploaded` });
+    } catch (e: any) {
+      toast({ title: "Video upload failed", description: e.message ?? String(e) });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onUploadCAD = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const baseSlug = await ensureUniqueSlug(slugBase);
+      const uploaded: any[] = [];
+      
+      for (const file of Array.from(files)) {
+        const ext = file.name.split('.').pop()?.toLowerCase() || '';
+        const kindMap: any = { 
+          stl: 'stl', 
+          step: 'step', 
+          stp: 'step', 
+          iges: 'iges', 
+          igs: 'iges', 
+          obj: 'obj' 
+        };
+        const kind = kindMap[ext] || 'stl';
+        
+        const path = `cad/${baseSlug}/${Date.now()}-${Math.random().toString(36).slice(2)}-${file.name}`;
+        const { error } = await supabase.storage.from("media-projects").upload(path, file, { 
+          upsert: false, 
+          contentType: 'application/octet-stream' 
+        });
+        if (error) throw error;
+        
+        const { data } = supabase.storage.from("media-projects").getPublicUrl(path);
+        uploaded.push({
+          url: data.publicUrl,
+          filename: file.name,
+          kind
+        });
+      }
+      
+      setCadFiles((prev) => [...prev, ...uploaded]);
+      toast({ title: "CAD files uploaded", description: `${files.length} file(s) uploaded` });
+    } catch (e: any) {
+      toast({ title: "CAD upload failed", description: e.message ?? String(e) });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeVideo = (index: number) => {
+    setVideos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeCAD = (index: number) => {
+    setCadFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !shortSummary || !dateStarted) {
@@ -776,7 +871,13 @@ function ProjectForm({ initial, onSave }: { initial?: any; onSave: (p: any) => v
       status,
       dateStarted,
       dateCompleted: dateCompleted || null,
-      media: { images, videoUrl: videoUrl || null },
+      media: { 
+        images, 
+        videoUrl: videoUrl || null,
+        videos: videos.length > 0 ? videos : undefined,
+        cad: cadFiles.length > 0 ? cadFiles : undefined,
+        driveUrl: driveUrl || undefined
+      },
       tags: tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
       githubUrl: githubUrl || null,
       externalLinks: externalLinks ? externalLinks.split(",").map((t) => t.trim()).filter(Boolean) : [],
@@ -886,6 +987,54 @@ function ProjectForm({ initial, onSave }: { initial?: any; onSave: (p: any) => v
                   ))}
                 </div>
               )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Videos</Label>
+              <Input type="file" accept=".mp4,.webm,.mov" multiple onChange={(e) => onUploadVideos(e.target.files)} disabled={uploading} />
+              <p className="text-xs text-muted-foreground">Recommend H.264/AAC MP4 for best browser support. Soft cap: 200MB per file.</p>
+              {videos.length > 0 && (
+                <div className="space-y-2">
+                  {videos.map((video, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{video.filename}</span>
+                        <Badge variant="outline">{video.mime.split('/')[1]}</Badge>
+                        {video.posterUrl && <span className="text-xs text-muted-foreground">+poster</span>}
+                      </div>
+                      <Button size="sm" variant="destructive" onClick={() => removeVideo(i)}>Remove</Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>CAD Files</Label>
+              <Input type="file" accept=".stl,.step,.stp,.iges,.igs,.obj" multiple onChange={(e) => onUploadCAD(e.target.files)} disabled={uploading} />
+              {cadFiles.length > 0 && (
+                <div className="space-y-2">
+                  {cadFiles.map((cad, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 border rounded">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{cad.filename}</span>
+                        <Badge variant="outline">{cad.kind}</Badge>
+                      </div>
+                      <Button size="sm" variant="destructive" onClick={() => removeCAD(i)}>Remove</Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Google Drive Folder (optional)</Label>
+              <Input 
+                value={driveUrl} 
+                onChange={(e) => setDriveUrl(e.target.value)} 
+                placeholder="https://drive.google.com/drive/folders/..." 
+              />
+              <p className="text-xs text-muted-foreground">Link to folder with large CAD assets</p>
             </div>
             <div className="pt-2">
               <Button type="submit">{initial ? "Save Changes" : "Publish"}</Button>

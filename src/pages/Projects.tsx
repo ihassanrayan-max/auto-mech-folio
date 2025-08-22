@@ -123,6 +123,8 @@ export default function Projects() {
                   status={p.status as any}
                   tags={p.tags}
                   onTagClick={(t) => setActiveTag(t)}
+                  hasVideo={((p.media as any)?.videos?.length ?? 0) > 0}
+                  hasCAD={((p.media as any)?.cad?.length ?? 0) > 0}
                 />
               );
             })}

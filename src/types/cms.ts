@@ -13,6 +13,18 @@ export type ProjectRow = {
   media: {
     images: string[]; // public URLs
     videoUrl?: string | null;
+    videos?: {
+      url: string;           // Supabase public URL
+      filename: string;      // original file name
+      mime: 'video/mp4' | 'video/webm' | 'video/quicktime';
+      posterUrl?: string;    // optional poster image
+    }[];
+    cad?: {
+      url: string;           // Supabase public URL
+      filename: string;
+      kind: 'stl'|'step'|'iges'|'obj'; // normalize extensions
+    }[];
+    driveUrl?: string;       // optional Google Drive folder link
   };
   tags: string[];
   githubUrl?: string | null;

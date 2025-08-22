@@ -85,6 +85,8 @@ const Index = () => {
                       category={p.category as any}
                       status={p.status as any}
                       tags={p.tags}
+                      hasVideo={((p.media as any)?.videos?.length ?? 0) > 0}
+                      hasCAD={((p.media as any)?.cad?.length ?? 0) > 0}
                     />
                   );
                 })}
