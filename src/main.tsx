@@ -1,14 +1,5 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Admin from "./pages/Admin"; // adjust path if different
+import { createRoot } from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
 
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
-  );
-}
+createRoot(document.getElementById("root")!).render(<App />);
