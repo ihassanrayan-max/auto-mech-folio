@@ -46,27 +46,73 @@ export default function About() {
   return (
     <main className="container py-12">
       <SEO
-        title="About Me | Mechanical Engineering Portfolio"
-        description="Biography, education, and extracurriculars of a mechanical engineering student."
+        title="About Me | Humza Muhammad - Mechanical Engineering"
+        description="Third-year Mechanical Engineering student at Ontario Tech University specializing in AI applications, robotics, and mechatronics."
         jsonLd={{
           '@context': 'https://schema.org',
           '@type': 'AboutPage',
-          name: 'About - Mechanical Engineering Portfolio',
+          name: 'About - Humza Muhammad - Mechanical Engineering Portfolio',
         }}
       />
       <h1 className="font-heading text-3xl sm:text-4xl font-bold mb-6">About Me</h1>
       <section className="grid md:grid-cols-3 gap-8">
-        <article className="md:col-span-2 space-y-4">
+        <article className="md:col-span-2 space-y-6">
           {markdown?.trim() ? (
             <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{markdown}</ReactMarkdown>
           ) : (
             <>
-              <p>
-                I am a mechanical engineering student passionate about designing efficient, reliable systems—from precise robotic mechanisms to scalable industrial automation. I enjoy solving open-ended problems and turning ideas into prototypes.
+              <p className="text-lg">
+                I'm <strong>Humza Muhammad</strong>, a third-year Mechanical Engineering student at <strong>Ontario Tech University</strong>, specializing in AI applications in engineering, graduating April 2028.
               </p>
               <p>
-                My interests include robotics, mechatronics, structural analysis, and sustainable energy systems. I thrive in multidisciplinary teams and love learning new tools and methods.
+                I design and build systems that merge mechanical design, embedded electronics, and intelligent software—from robots and drones to AI-assisted tools.
               </p>
+              
+              <div className="space-y-4">
+                <h3 className="font-heading text-xl font-semibold">My experience spans:</h3>
+                <ul className="space-y-2 text-muted-foreground">
+                  <li><strong className="text-foreground">Mechanical Design & CAD</strong> – SolidWorks, NX, Fusion 360; assemblies, drawings, GD&T</li>
+                  <li><strong className="text-foreground">Analysis & Testing</strong> – Intro FEA, tolerance/fit, prototyping for strength & reliability</li>
+                  <li><strong className="text-foreground">Embedded Systems & Controls</strong> – ESP32/Arduino, PWM motor control, sensor fusion (MPU6050, BME280, GPS), PID basics</li>
+                  <li><strong className="text-foreground">Programming & Software</strong> – C/C++, Python, MATLAB; web (Next.js/React, Node)</li>
+                </ul>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-heading text-xl font-semibold">I've applied these skills to:</h3>
+                <div className="grid gap-3">
+                  <div className="flex gap-3">
+                    <span className="text-2xl">🛠</span>
+                    <div>
+                      <strong>Autonomous Drone Platform</strong> – ESP32 flight controller, custom wiring, sensor fusion, 3D-printed frame for mapping/survey use-cases
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="text-2xl">🤖</span>
+                    <div>
+                      <strong>Line-Following Robot</strong> – Dual-IR sensing with L298N motor control
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="text-2xl">💻</span>
+                    <div>
+                      <strong>JobBot (SaaS)</strong> – AI résumé/cover-letter generator with ATS-aware prompts and admin tools
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="text-2xl">🌐</span>
+                    <div>
+                      <strong>Client Sites</strong> – Next.js/Tailwind builds with scheduling/Stripe and simple CMS
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-secondary/50 rounded-lg">
+                <p className="font-medium">
+                  Seeking <strong>Fall 2025 co-op/internship roles</strong> in mechanical design, testing, or mechatronics/controls.
+                </p>
+              </div>
             </>
           )}
 
@@ -94,21 +140,44 @@ export default function About() {
             </div>
           )}
         </article>
-        <aside className="space-y-4">
+        <aside className="space-y-6">
           <div>
-            <h2 className="font-heading text-xl mb-2">Education</h2>
-            <ul className="list-disc pl-5 text-muted-foreground">
-              <li>B.S. Mechanical Engineering — University of XYZ (Expected 2026)</li>
-              <li>Relevant Coursework: Dynamics, Controls, Machine Design, Thermodynamics, FEA, CFD</li>
-            </ul>
+            <h2 className="font-heading text-xl font-semibold mb-3">Education</h2>
+            <div className="space-y-2 text-muted-foreground">
+              <p><strong className="text-foreground">B.S. Mechanical Engineering</strong></p>
+              <p>Ontario Tech University</p>
+              <p>Expected: April 2028</p>
+              <p className="text-sm">Specializing in AI applications in engineering</p>
+            </div>
           </div>
           <div>
-            <h2 className="font-heading text-xl mb-2">Extracurriculars</h2>
-            <ul className="list-disc pl-5 text-muted-foreground">
-              <li>Robotics Club — Mechanical Lead</li>
-              <li>Formula Student — Chassis & Aerodynamics</li>
-              <li>Maker Society — 3D Printing & Rapid Prototyping</li>
-            </ul>
+            <h2 className="font-heading text-xl font-semibold mb-3">Relevant Coursework</h2>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <div>
+                <h4 className="font-medium text-foreground">Core Mechanics</h4>
+                <p>Statics, Dynamics, Strength of Materials, Machine Design</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-foreground">Thermofluids</h4>
+                <p>Thermodynamics, Fluid Mechanics, Heat Transfer</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-foreground">Controls & Mechatronics</h4>
+                <p>Signals & Systems, Feedback Control, Mechatronics, Sensors & Instrumentation</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-foreground">Computing & Data</h4>
+                <p>MATLAB & Numerical Methods, Programming (C/C++/Python), Data Analysis</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-foreground">Design & Manufacturing</h4>
+                <p>CAD/CAM, Manufacturing Processes, Tolerancing & GD&T</p>
+              </div>
+              <div>
+                <h4 className="font-medium text-foreground">AI/Applied Computing</h4>
+                <p>Intro to AI for Engineers, Optimization/Linear Algebra, Basic Computer Vision</p>
+              </div>
+            </div>
           </div>
         </aside>
       </section>
