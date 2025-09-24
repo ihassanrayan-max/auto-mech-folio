@@ -28,7 +28,7 @@ const Index = () => {
   const { data: siteSettings } = useQuery({
     queryKey: ["site_settings", "main"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("site_settings").select("*").eq("id", "main").maybeSingle();
+      const { data, error } = await supabase.rpc("get_public_site_settings");
       if (error) throw error;
       return data as any;
     },
