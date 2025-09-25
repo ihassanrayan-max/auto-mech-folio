@@ -415,22 +415,6 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
   };
 
   const handleSaveSiteSettings = async () => {
-    // Check authentication first
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return toast({ 
-        title: "Authentication required", 
-        description: "Please sign in again to save settings." 
-      });
-    }
-
-    if (!isAdmin) {
-      return toast({ 
-        title: "Permission denied", 
-        description: "Only admin users can modify site settings." 
-      });
-    }
-
     if (contactEmail && !/^([^@\s]+)@([^@\s]+)\.[^@\s]+$/.test(contactEmail)) {
       return toast({ title: "Invalid email", description: "Please enter a valid email address." });
     }
@@ -452,16 +436,7 @@ const [settings, setSettings] = useState<SiteSettings | null>(null);
     };
 
     const { data, error } = await supabase.from("site_settings").upsert(payload, { onConflict: "id" }).select().maybeSingle();
-    if (error) {
-      console.error("Site settings save error:", error);
-      if (error.message.includes("row-level security")) {
-        return toast({ 
-          title: "Permission denied", 
-          description: "Please sign out and sign in again as admin." 
-        });
-      }
-      return toast({ title: "Settings failed", description: error.message });
-    }
+    if (error) return toast({ title: "Settings failed", description: error.message });
     setSettings((data as any) ?? payload);
     toast({ title: "Settings saved" });
   };
