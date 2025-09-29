@@ -70,7 +70,7 @@ export default function Skills() {
               </div>
               <div>
                 <h4 className="font-medium text-foreground">Analysis</h4>
-                <p className="text-sm">Introductory FEA in ANSYS Mechanical, MATLAB for simulations</p>
+                <p className="text-sm">Introductory FEA in Siemens NX, MATLAB for simulations</p>
               </div>
               <div>
                 <h4 className="font-medium text-foreground">Programming</h4>
@@ -95,7 +95,6 @@ export default function Skills() {
               <div>• Computer-Aided Design (CAD)</div>
               <div>• Thermodynamics I</div>
               <div>• Fluid Mechanics I</div>
-              <div>• Manufacturing Processes</div>
             </div>
           </div>
         </div>

@@ -108,11 +108,6 @@ export default function About() {
                 </div>
               </div>
 
-              <div className="p-4 bg-secondary/50 rounded-lg">
-                <p className="font-medium">
-                  Seeking <strong>Fall 2025 co-op/internship roles</strong> in mechanical design, testing, or mechatronics/controls.
-                </p>
-              </div>
             </>
           )}
 
@@ -155,27 +150,31 @@ export default function About() {
             <div className="space-y-3 text-sm text-muted-foreground">
               <div>
                 <h4 className="font-medium text-foreground">Core Mechanics</h4>
-                <p>Statics, Dynamics, Strength of Materials, Machine Design</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Statics (MECE 2230U)</li>
+                  <li>Dynamics (MECE 2430U)</li>
+                  <li>Strength of Materials I & II (MECE 2420U, MECE 3420U)</li>
+                  <li>Mechanical Vibrations (MECE 3210U)</li>
+                  <li>Kinematics & Dynamics of Machines (MECE 3270U)</li>
+                  <li>Mechanics and Stress Analysis (MECE 4210U)</li>
+                </ul>
               </div>
               <div>
                 <h4 className="font-medium text-foreground">Thermofluids</h4>
-                <p>Thermodynamics, Fluid Mechanics, Heat Transfer</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Thermodynamics (MECE 2320U, MECE 3240U)</li>
+                  <li>Fluid Mechanics (MECE 2860U)</li>
+                  <li>Heat Transfer (MECE 3260U)</li>
+                </ul>
               </div>
               <div>
                 <h4 className="font-medium text-foreground">Controls & Mechatronics</h4>
-                <p>Signals & Systems, Feedback Control, Mechatronics, Sensors & Instrumentation</p>
-              </div>
-              <div>
-                <h4 className="font-medium text-foreground">Computing & Data</h4>
-                <p>MATLAB & Numerical Methods, Programming (C/C++/Python), Data Analysis</p>
-              </div>
-              <div>
-                <h4 className="font-medium text-foreground">Design & Manufacturing</h4>
-                <p>CAD/CAM, Manufacturing Processes, Tolerancing & GD&T</p>
-              </div>
-              <div>
-                <h4 className="font-medium text-foreground">AI/Applied Computing</h4>
-                <p>Intro to AI for Engineers, Optimization/Linear Algebra, Basic Computer Vision</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Electric Circuits (ELEE 2790U)</li>
+                  <li>Control Systems (MECE 3350U)</li>
+                  <li>Mechatronics (MECE 3390U)</li>
+                  <li>Machine Design (MECE 3220U)</li>
+                </ul>
               </div>
             </div>
           </div>
